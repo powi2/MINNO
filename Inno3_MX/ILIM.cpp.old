@@ -1,0 +1,3532 @@
+//==============================================================================
+// ILIM.cpp (User function)
+// 
+//    void ILIM_user_init(test_function& func)
+//    void ILIM(test_function& func)
+//
+//==============================================================================
+
+#include "asl.h"
+// Disable warning C4244 "conversion from 'const double' to 'float', possible loss of data"
+#pragma warning (disable : 4244)
+#pragma warning (disable : 4305)
+#include "ILIM.h"
+
+// !!!! User #includes and externs can be placed between the comments
+// !!!!
+
+// *************************************************************************
+
+void ILIM_user_init(test_function& func)
+{
+	ILIM_params *ours;
+    ours = (ILIM_params *)func.params;
+
+// !!!! User initialization code below this comment (do not remove comment)
+
+// !!!! User initialization code above this comment (do not remove comment)
+}
+
+// *************************************************************************
+
+void ILIM(test_function& func)
+{
+    // The two lines below must be the first two in the function.
+    ILIM_params *ours;
+    ours = (ILIM_params *)func.params;
+
+	int set_fail_bin = ours->fail_bin;
+
+	Func_name = "ILIM";
+	gFuncNum++;
+	if(gDisplay_FuncNum)
+		PiDatalog(func, A_Func_Num_ILIM,		gFuncNum,		set_fail_bin,	POWER_UNIT);
+
+	//Skip Test if AbortTest set 
+	if (AbortTest)
+		return;
+
+	float	ILIM_S=0.0,
+			ILIM_S_Err=0.0,
+			DIDT_S=0.0,
+			DIDT_S_Err=0.0,
+			TON_S=0.0,
+			ILIM_70pct_mA_P=0.0,
+			ILIM_70pct_P=0.0,
+			DIDT_70pct_P=0.0,
+			TON_70pct_P=0.0,
+			I2F_S=0.0,
+			I2F_S_Err=0.0,
+			ILIM_exp_S=0.0,
+			ILIM_act_S=0.0,
+			VIND_P1_S=0.0,
+			ILIM_P1_S=0.0,
+			ILIM_P1_S_Err=0.0,
+			DIDT_P1_S=0.0,
+			TON_P1_S=0.0,
+			RDSON_P1_S=0.0,
+			ILIM_LO_S=0.0,
+			ILIM_LO_Err_S=0.0,
+			ILIM_Med_S=0.0,
+			ILIM_Med_Err_S=0.0,
+			ILIM_High_S=0.0,
+			ILIM_High_Err_S=0.0,
+			IlimHigh_JitterLow_132kHz_S=0.0,
+			IlimLow_JitterHigh_132kHz_S=0.0,
+			ILIM_Reduce_w_Jitter_132kHz=0.0,
+			IlimHigh_JitterLow_18kHz_S=0.0,
+			IlimLow_JitterHigh_18kHz_S=0.0,
+			ILIM_Reduce_w_Jitter_18kHz=0.0,
+			RxTx_CycReq_cnt			= 0.0,
+			RxTx_Hi_BPS_Low_Rcv		= 0.0,
+			RxTx_Lo_BPS_Low_Rcv		= 0.0,
+			RxTx_Hi_BPS_High_Rcv	= 0.0,
+			RxTx_Lo_BPS_High_Rcv	= 0.0,
+			Fosc_Mod_18kHz_S	=0.0,
+			Fosc_Sss_P			=0.0,
+			tsoft_SSS			=0.0,
+			tHandshake_SSS		=0.0,
+			Fosc_min_SSS		=0.0,
+			Fosc_max_SSS		=0.0,
+			fModulation_P		=0.0,
+			tRTM				=0.0;
+
+	float ILIM_Jit18K_S = 0;
+	float ILIMhi_Jit18K_S = 0;
+	float ILIMLo_Jit18K_S = 0;
+	float Fosc_Mod_18K_S = 0;
+	float tChUp_RTM_P = 0;
+
+	float	ilim_Spec_P	= 0.0;
+	float   Dummy_vped=0.0;
+	float	Dummy_ilim=0.0, Dummy_didt=0.0, Dummy_ton=0.0;
+	float   Dummy_rdson_peak = 0.0, Dummy_rdson_spec =0.0;
+	float	Rdson_peak_rslt =0.0, Rdson_spec_rslt =0.0;		// RDSON_P1_S, Rdson_Spec_P
+	float   ILIM_Seak_rslt = 0.0;
+
+	float	PV3_Charge =0.0;
+	float	Vped_meas  =0.0;
+	float   Vpv3_meas  =0.0;
+	int		lcnt=0;
+
+	int     ILIM_Debug =0;
+	int     Debug_CAPTURED; 
+	int		ILIM_n_pulses =0;
+
+	float	tmeas=0.0, fmeas=0.0;
+
+	float	vStep=0.0;
+	int		i=0, ENG_Data_Collect=0;
+	float	ChB_vrng=0.0;
+	int		vrng_b	=0.0;
+	int		SR_AF_temp[100]={0};
+
+	float	InvSync_vREF = 0;
+
+	if(OPCODE==4300 || OPCODE==4500) 
+	{
+		if(MOSFET_SIZE == 2)		InvSync_vREF = 4.5;
+		if(MOSFET_SIZE == 3)		InvSync_vREF = 4.5;
+		if(MOSFET_SIZE == 4)		InvSync_vREF = 4.0;
+		if(MOSFET_SIZE == 5)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 6)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 7)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 8)		
+			if (gSiliconRev_P == 3)
+				InvSync_vREF = 0.0;	// HQL 3/19/2018 For INN3168C-H106 B3p/B4s ONLY at HOT. This is for RDSON_P1 @ HOT
+			else
+				InvSync_vREF = 4.0;	// CX 2/15/17
+	}
+	else if(OPCODE==4400) 
+	{
+		if(MOSFET_SIZE == 2)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 3)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 4)		InvSync_vREF = 3.0;
+		if(MOSFET_SIZE == 5)		InvSync_vREF = 5.5;
+		if(MOSFET_SIZE == 6)		InvSync_vREF = 5.5;
+		if(MOSFET_SIZE == 7)		InvSync_vREF = 5.5;
+		if(MOSFET_SIZE == 8)		InvSync_vREF = 5.5;
+	}
+	else ////4200 & 4250
+	{
+		if(MOSFET_SIZE == 2)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 3)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 4)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 5)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 6)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 7)		InvSync_vREF = 1.0;//was 3.0
+		if(MOSFET_SIZE == 8)		InvSync_vREF = 1.0;//was 3.0
+	}
+
+	if(g_TurretCB)
+	{
+		if(MOSFET_SIZE == 5)		InvSync_vREF = 2.5;
+	}
+
+	ILIM_Debug			= 0;
+	Debug_CAPTURED		= ILIM_NORM;
+	gFind_ILIM_Jitter	= 1;
+	FIND_RDSON_Peak_FLAG = 0;		// Will be reset at the end of  Gage_Find_Ilim func
+
+	//Reset Jitter ILIM variables
+	gIdmax_Jitter_132kHz = -999;
+	gIdmin_Jitter_132kHz = -999;
+
+	Pulse pulse(PULSE_RISING_EDGE,10e-6);			//external trigger pulse from dvi for debug
+	//pulse.do_pulse();
+/********************************************************************************
+ *					ILIM Post trim:												*
+ * Note: If ILIM measure from testmode, ILIM should shows flat from scope.		*
+ *		 In normal-mode, ILIM will show Jitter from scope.						*
+ ********************************************************************************/
+	////Setup for FB clocking between 1V to 1.5V at 100kHz
+	//wait.delay_10_us(100);  	
+	//if(LB_Rev >= 5||g_TurretCB)		ddd_7->ddd_set_hi_level(1.7); //8% instead of 5%
+	//else							ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	//ddd_7->ddd_set_lo_level(0.9);							// Will immediately change to this level upon execution
+	//delay(1);
+	//ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+	//wait.delay_10_us(100);
+
+	PV3_Charge_On(RANGE_100_V);	//Prepare PV3 before power-up
+	PV3_Check_Charge(RANGE_100_V);
+	pv3_4->charge_off();
+	//delay(g_ILIM_dly);	//delay needed to get the correct ILIM reading
+
+	//************************************************************************************************************************
+	//************************* ILIM_NORM  && RDSON_SPEC START ***************************************************************
+	//************************************************************************************************************************
+	//ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);			// Will immediately change to this level upon execution
+	//ddd_7->ddd_set_lo_level(gCV_Low);							// Will immediately change to this level upon execution
+	//delay(1);
+	//ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+	//wait.delay_10_us(3);
+//
+	SAMPLE_SIZE = GAGE_POST_32K;
+	INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+
+	//delay(200);
+	Close_relay(K3);	//Drain to L1 to 50ohm to K2NC to K1NC to DVI-11-0 (delay is inside power-up)
+//
+	if(LB_Rev >= 9)	
+	{
+		if(gSiliconRev_P>=3)
+			Close_relay(K37);				//Connect 1uF to BPP pin via Mux_20_1_2
+		//mux_20->close_relay(MUX_1_2);	//Connect 1uF to BPP pin via Mux_20_1_2
+	}
+	delay(5);
+
+
+	//VBPP_Negative_Cycle();
+
+
+#define PU_2ndary_Prog_AF_REG
+#ifndef PU_2ndary_Prog_AF_REG
+	//if(REL_FLOW)	delay(g_REL_dly+50);	//delay needed to get the correct ILIM reading
+	VBPP_Negative_Cycle();
+	//Testing out Primary TM5 Bypass Wait and Listen, then TM2 for ILIM with "NO Jitter"  with Secondary Control
+			//Setup Vpin for digital clocking
+				ovi_1->disconnect(OVI_CHANNEL_1);	
+				// Initialize DDD
+				ddd_7->ddd_set_lo_level(0.1);		// Will immediately change to this level upon execution 
+				ddd_7->ddd_set_hi_level(4.0);		// Will immediately change to this level upon execution
+				delay(1);
+				ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+				wait.delay_10_us(10);
+				Close_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+			//Setup FB to connect to DDD
+				REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);	// OVI_1_2	
+				wait.delay_10_us(5);
+				Close_relay(K17);	
+			//Have InvSync circuit ready for communication
+				Connect_InvSyn_IM(Low_Vd_Input);
+
+			//Primary Power up with TM2 and TM5 in same power up
+				D_dvi->set_current(D_ch, 300e-3,	RANGE_300_MA);		
+				D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+				wait.delay_10_us(20);
+				BPP_ovi->set_current(BPP_ch, 30e-3,	RANGE_30_MA);
+				VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+				wait.delay_10_us(20);
+				
+				//Vpin clock
+				Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+				wait.delay_10_us(10);
+
+				dvi_11->set_voltage(DVI_CHANNEL_0, 40.0, VOLT_50_RANGE);	//be able to see AF links properly
+				wait.delay_10_us(50);
+
+				VBPP_ramp_up(5.0, gVBPP_PV_Init, 50e-3);		
+
+				D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+				wait.delay_10_us(5);
+				VBPP_ramp_down(gVBPP_PV_Init, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+				wait.delay_10_us(3);	//1.0 uF	(ILIM)		30us for ILIM NORM
+
+				//BPP set 4.5V for 100us and 5.2V to bring chip back to normal operation
+				ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_M_Init-200e-3, RANGE_10_V);
+				wait.delay_10_us(50);
+			if(gSiliconRev_P >= 3)
+			{
+				BPP_ovi->set_current(BPP_ch, 2e-3,	RANGE_30_MA);		//						B3 material
+				VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+				wait.delay_10_us(10);
+			}
+			else
+			{
+				ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_Init+50e-3, RANGE_10_V);
+				wait.delay_10_us(30);
+			}
+				//Drain set to 5V for switching
+				dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+				wait.delay_10_us(20);
+
+				//Bring Vpin OVI back
+				ovi_1->connect(OVI_CHANNEL_1);	
+				wait.delay_10_us(20);
+				VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+				VPIN_ovi->set_current(VPIN_ch, 30e-3,		RANGE_30_MA);  
+				wait.delay_10_us(50);
+				Open_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+				delay(1);
+				
+			if(LB_Rev >= 5)			ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+			else					ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+			delay(1);
+			ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+			wait.delay_10_us(50);
+
+			//SR (0V)	(Requires dead short.  DVI-2k is not responding fast enough that SR could have pull-up and back to ground)
+			//			(We just can't see it from the scope.  So, try to short this from BUS3 through MUX_GND)
+			SR_dvi2k->set_current(SR_ch, 20e-3,			RANGE_2_A);	
+			SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+			delay(2);
+			mux_20->close_relay(MUX_1_1);
+			delay(2);
+			dvi_13->close_relay(BUS_SENSE1);
+			dvi_13->close_relay(BUS_FORCE1);
+			mux_14->close_relay(MUX_3_BUS3);
+			delay(3);
+
+			//Vout (4V)
+			VO_dvi->set_current(VO_ch, 300.0e-3,	RANGE_300_MA);	
+			VO_dvi->set_voltage(VO_ch, 4.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+			if (gTrim_VR_S == 1)
+			{
+				VO_dvi->set_voltage(VO_ch, 4.5, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+				ddd_7->ddd_set_hi_level(1.5);	//1.328 default
+			}
+			//IS (0V)
+			if(g_TurretCB)
+			{
+				FWC_dvi2k->set_voltage(FWC_ch, 0.0,		VOLT_2_RANGE);	// DVI_21_0 (20mV) above ground so it's not short to GND (take care of SCEN bit)
+				FWC_dvi2k->set_current(FWC_ch, 200.0e-3,	RANGE_2_A);
+			}
+			else
+			{
+				FWC_dvi2k->set_voltage(FWC_ch, 0.0,		VOLT_2_RANGE);	// DVI_21_0 (20mV) above ground so it's not short to GND (take care of SCEN bit)
+				FWC_dvi2k->set_current(FWC_ch, 20.0e-3,	RANGE_20_MA);
+			}
+			wait.delay_10_us(10);
+			//BPS (vPlus - 200mV)
+			BPS_dvi->set_current(BPS_ch, 300e-3,					RANGE_300_MA);	
+			VBPS_Power_Up(gVBPS_M_Init-0.2);			// vfinal  
+
+			BPS_dvi->set_voltage(BPS_ch, gVBPS_final, 	VOLT_10_RANGE);	// Secondary vBPS_plus
+			wait.delay_10_us(10);
+
+			//Bypass tSoft with FB purposely set high low high
+			delay(1);
+			//FB stop switching with FB set to gCVth_15pct_Higher
+			ddd_7->ddd_set_lo_level(gCV_Low);								// Will immediately change to this level upon execution
+			if (gTrim_VR_S == 1)
+				ddd_7->ddd_set_lo_level(gCV_Low+10e-3);								// Will immediately change to this level upon execution
+			delay(1);
+			// Temporarily fix - to avoid the device going into FWPK switching. 2/13/17 HQL.
+			VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+			wait.delay_10_us(10);
+			ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+			wait.delay_10_us(50);
+			ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+			wait.delay_10_us(50);
+
+	D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(5);
+
+	//InvSyn circuit
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,		VOLT_20_RANGE);	// Higher for hot test
+	wait.delay_10_us(10);
+
+	// Connect Inductor to Drain
+	Open_relay(K3);											// Drain to RL pullup
+	Close_relay(KIM1);										// Connect Vind to CT2+ to CT2-
+	Close_relay(K9);										// Connect CT2- to Drain
+	Close_relay(K1);			// Connect Iped to CT2+ to CT2-
+	Open_relay(KIM3);										// ILIM Pedestal Use resistor Rpd1 (100mA)
+	delay(4);
+
+	//FB set back to 0.8V 
+	ddd_7->ddd_set_lo_level(gCV_Low);								// Will immediately change to this level upon execution
+	if (gTrim_VR_S == 1)
+		ddd_7->ddd_set_lo_level(gCV_Low+10e-3);								// Will immediately change to this level upon execution
+	delay(1);
+
+    InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,        VOLT_20_RANGE);    // cx 11/10/16
+
+	// Setup Pedestal
+	D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+	D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+	D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+	wait.delay_10_us(50);
+
+	//** Do not set breakpoint beyond this point **
+
+	if(g_TurretCB)
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM+1.5); //Drive Voltage
+		wait.delay_10_us(1500); //HL added to prevent invalid failure on Turret CB
+	}
+	else
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+		
+	}
+
+	// Enable RTM by switch >110kHz for >200usec. //
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	//See that the initial request gave me lower ILIM and later request give me correct ILIM.  TEMPORARY ADD HERE. REQUIRE DE
+	//ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	//wait.delay_10_us(100);
+	
+	//** ILIM_NORM **
+
+	Gage_Start_Capture(  );
+
+	//Run Pattern to have ILIM switch for 18pulses, then OFF 30us, ON 10us, OFF 200us and ON for 3 pulses of 100kHz
+	ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	wait.delay_10_us(50);
+
+	//Gage Capture Complete
+	Gage_Wait_For_Capture_Complete();
+#endif
+
+#ifdef PU_2ndary_Prog_AF_REG
+//#if 1
+//
+	VBPP_Negative_Cycle();
+
+	//Primary Power up with TM2 and TM5 in same power up
+	D_dvi->set_current(D_ch, 300e-3,	RANGE_300_MA);		
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+	wait.delay_10_us(20);
+	BPP_ovi->set_current(BPP_ch, 30e-3,	RANGE_30_MA);
+	VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+	wait.delay_10_us(20);
+//Testing out Primary TM5 Bypass Wait and Listen, then TM2 for ILIM with "NO Jitter"  with Secondary Control
+//Setup Vpin for digital clocking
+	ovi_1->disconnect(OVI_CHANNEL_1);
+	wait.delay_10_us(100);  	
+	// Initialize DDD
+	ddd_7->ddd_set_lo_level(0.1);		// Will immediately change to this level upon execution 
+	ddd_7->ddd_set_hi_level(4.0);		// Will immediately change to this level upon execution
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(10);
+	Close_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	delay(5);
+	Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+	wait.delay_10_us(10);
+
+	dvi_11->set_voltage(DVI_CHANNEL_0, 40.0, VOLT_50_RANGE);	//be able to see AF links properly
+	wait.delay_10_us(50);
+
+	/*VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);	*/
+	if(gSiliconRev_P >= 3)		VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);		
+	else						VBPP_ramp_up(5.0, gVBPP_PV_Init,  50e-3);	
+
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+	wait.delay_10_us(5);
+	VBPP_ramp_down(gVBPP_PV_final, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+	wait.delay_10_us(3);	//1.0 uF	(ILIM)		30us for ILIM NORM
+
+	//BPP set 4.5V for 100us and 5.2V to bring chip back to normal operation
+	ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_M_Init-200e-3, RANGE_10_V);
+	wait.delay_10_us(50);
+
+	if(gSiliconRev_P >= 3)
+	{
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(10);
+	}
+	else
+	{
+		//ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_final, RANGE_10_V);
+		ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_Init+50e-3, RANGE_10_V);
+		wait.delay_10_us(30);
+	}
+
+//Bring Vpin OVI back
+	ovi_1->connect(OVI_CHANNEL_1);	
+	wait.delay_10_us(20);
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+	VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+	wait.delay_10_us(10);
+	Open_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	wait.delay_10_us(10);
+
+	//PROG mode to program out XFWPK bit to disable FWPK switching
+	// Also Program out the External FB option
+
+	Powerup_Secondary_in_Testmode(gProgRead_AFreg_S, 0, 0);
+	wait.delay_10_us(20);
+	BPS_dvi->set_voltage(BPS_ch, gVBPS_final,	VOLT_10_RANGE);			
+	wait.delay_10_us(20);
+
+	//Read/write AF register
+	Close_relay(K26);	//SR to DDD-7-5
+	delay(3);
+	//DEBUG=1;
+	Read_Secondary_AF_Reg (SR_AF_temp);	//must be followed by write
+	//MINNO Trim bits
+	//Write corrected bits into AF register
+	SR_AF_temp[5]=0;	// Programming out PK1&Xspeedload
+	SR_AF_temp[6]=0;	// Programming out PK2
+	SR_AF_temp[7]=0;	// Programming out PK3
+	SR_AF_temp[22]=0;	// Programming out PKdig<1>
+	SR_AF_temp[23]=0;	// Programming out PKdig<2>
+	SR_AF_temp[24]=0;	// Programming out PKdig<3>
+	SR_AF_temp[25]=0;	// Programming out PKdig<4>
+	SR_AF_temp[42]=1;	// Programming in  DOPL
+	SR_AF_temp[44]=1;	// Programming in  FWPK
+	Write_Secondary_AF_Reg (SR_AF_temp);
+
+	Open_relay(K18);
+	Open_relay(K21);
+	delay(2);
+
+	SR_dvi2k->open_relay(CONN_FORCE1);
+	SR_dvi2k->open_relay(CONN_SENSE1);
+	Close_relay(K5);//Connect SR to 5nF
+	delay(2);
+
+	REQ_ovi->set_voltage(REQ_ch, gCV_Low, 		RANGE_5_V);	
+	wait.delay_10_us(10);
+	Connect_InvSyn_IM(Low_Load_Vd_Input);
+	if(gSiliconRev_P>=3)
+	{
+		//BPP_ovi->set_current(BPP_ch, 2e-3,	RANGE_30_MA);		//						B3 material
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 10e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(10);
+	}
+	//Drain set to 5V for switching
+	dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+	wait.delay_10_us(100);  	
+
+	//FB (2V)  pull FB above CVth to force No Switching
+	ddd_7->ddd_set_hi_level(1.7);//Changed REQ levels for MINNO
+	ddd_7->ddd_set_lo_level(0.9);								// Will immediately change to this level upon execution
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(5);
+	Close_relay(K17);	
+	delay(5);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(20);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(20);
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,        VOLT_20_RANGE);    // Avoid noise coupling over to InvSynCircuit to FW
+    wait.delay_10_us(50); 
+
+	D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(50);
+
+//Commented out for MINNO
+	/*
+	//SR_dvi2k->set_current(SR_ch, 0.0e-6,	RANGE_2_UA);	
+	//SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+	//delay(2);
+	//mux_20->close_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+	//delay(2);
+	//dvi_13->close_relay(BUS_SENSE1);
+	//dvi_13->close_relay(BUS_FORCE1);
+	//mux_14->close_relay(MUX_3_BUS3);
+	//delay(2);
+*/
+	
+	// Connect Inductor to Drain
+	Open_relay(K3);											// Drain to RL pullup
+	Close_relay(KIM1);										// Connect Vind to CT2+ to CT2-
+	Close_relay(K9);										// Connect CT2- to Drain
+	Close_relay(K1);			// Connect Iped to CT2+ to CT2-
+	//	Open_relay(K1);				// Connect Iped to CT2+ to CT2-
+	if ((strcmp("INN3466C-HZ99", Dev_id) == 0)||(strcmp("INN3467C-HZ99", Dev_id) == 0)||(strcmp("INN3467C-HZ98", Dev_id) == 0)||(strcmp("INN3468C-HZ99", Dev_id) == 0))// DLM ILIM evaluation experiment only, use Rped2
+		Close_relay(KIM3);	// ILIM Pedestal Use resistor Rpd2 (953mA)
+		//Open_relay(KIM3);
+	else if (strcmp("INN3465C-HZ99", Dev_id) == 0)
+		Open_relay(KIM3);										// ILIM Pedestal Use resistor Rpd1 (100mA)
+	else if (MOSFET_SIZE==8 && gILIM_TARGET_S > 2.2)  //Use Rped2 for Minno 2400mA ILIM
+		Close_relay(KIM3);
+	else
+		Open_relay(KIM3);
+
+	delay(4);
+
+    //RS Note:  Vinminus varies between 3.5V to -5.0V.  So, keeping Vinplus = 2.5v should be good for size 2.
+    //ET Note:  Vinminus varies between 0.7V to -4.8V.  So, keeping Vinplus = -1.5V should be good for size 2
+	if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -3.0,        VOLT_20_RANGE);    
+
+	}
+	else
+	{
+		if(MOSFET_SIZE==8 && gILIM_TARGET_S > 2.2)
+		{
+			if(OPCODE==4300 ||OPCODE==4500)
+			{
+				InvSyn_REF_ovi->set_voltage(InvSyn_ch, 0.5*InvSync_vREF,        VOLT_20_RANGE);    // HL 2/5/2018
+
+			}
+			else
+			{
+				InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,        VOLT_20_RANGE);    // cx 11/10/16
+			}
+
+		}
+		else
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch,  InvSync_vREF,        VOLT_20_RANGE);    // cx 11/10/16
+		}
+
+	}
+    wait.delay_10_us(50); 
+
+	if(g_TurretCB)
+	{
+		// Setup Pedestal
+		D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+		D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+		D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+		wait.delay_10_us(50);
+	}
+	else
+	{
+		// Setup Pedestal
+		D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+		D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+		D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+		wait.delay_10_us(50);
+		delay(5);
+	}
+
+	if(g_TurretCB)
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+		delay(5);
+	}
+	else
+	{
+		if(OPCODE==4300 ||OPCODE==4500)
+		{
+			if((MOSFET_SIZE == 6 && LB_Rev >= 5)||(MOSFET_SIZE==8 && gILIM_TARGET_S > 2.2))
+			{
+				PV3_Connect_Drain_and_DriveON(Vind_RM+1.5); //Drive Voltage
+			}
+			else
+			{
+				PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+
+			}
+		}
+		else
+		{
+			PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+		}
+		
+	}
+	pulse.do_pulse();
+
+	// Enable RTM by switch >110kHz for >200usec. //
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	//////See that the initial request gave me lower ILIM and later request give me correct ILIM.  TEMPORARY ADD HERE. REQUIRE DE
+	////ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	////wait.delay_10_us(100);
+
+//////////
+	Gage_Start_Capture(  );
+
+	//Setup to have ILIM switch for 18pulses, then OFF 30us, ON 10us, OFF 200us and ON for 3 pulses of 100kHz
+	ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	wait.delay_10_us(50);
+
+	Gage_Wait_For_Capture_Complete();
+
+	pv3_4->drive_off();	
+#endif
+
+	//DEBUG=1;
+	//gDEBUG=1;
+	// Process data
+	WAVE_NAME =  "ILIM_NORM";
+	if(g_TurretCB)
+	{
+		//Large spike at ILIM peak to cause wrong ILIM peak calculation.
+		Gage_Find_Ilim_Turret(&ILIM_S, &DIDT_S, &TON_S, &Dummy_rdson_peak, &Dummy_rdson_spec);
+	}
+	else
+	{
+		Gage_Find_Ilim(&ILIM_S, &DIDT_S, &TON_S, &Dummy_rdson_peak, &Dummy_rdson_spec);
+	}
+	//DEBUG=0;
+	//gDEBUG=0;
+	I2F_S = ILIM_S *ILIM_S * 100e3 * 1e-3;	//FB clocking request at 100kHz hence multiply by 100e3
+//	Calculate ILIM_act trim
+	if( gILIM_pt_S !=0)
+		ILIM_act_S = (ILIM_S/gILIM_pt_S -1)*100;
+	else 
+		ILIM_act_S = 999.0;
+
+	ILIM_S_Err = (ILIM_S/gILIM_TARGET_S - 1.0)*100.0;
+	DIDT_S_Err = (DIDT_S/gDIDT_TARGET - 1.0)*100.0;
+	I2F_S_Err = (I2F_S/gI2F_S_TARGET - 1.0)*100.0;
+
+	ILIM_LO_Err_S = gILIM_pct_1stP-(gILIM_LO_TARGET/gILIM_TARGET_S)*100;
+	ILIM_Med_Err_S = gILIM_pct_2ndP-(gILIM_LO_Med_TARGET/gILIM_TARGET_S)*100;
+	ILIM_High_Err_S = gILIM_pct_3rdP-(gILIM_UP_Med_TARGET/gILIM_TARGET_S)*100;
+
+    //JD short-term fixed.
+	PiDatalog(func, A_ILIM_Low_S,				gILIM_pct_1stP,				set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_ILIM_Med_S,				gILIM_pct_2ndP,				set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_ILIM_High_S,				gILIM_pct_3rdP,				set_fail_bin,	POWER_UNIT);
+//goto ILIM_END;
+	//*******************************************************************************************************
+	//********* Receiver and Transmitter sanity check START *************************************************
+	//*******************************************************************************************************
+	//Test procedure: - FB request 100 cyles at 100kHz (Transmitter side).  vBPS=vBPS_plus+50mV, vBPS=4V
+	//				  - Expect Drain (Receiver side) to switch 100 times at 100kHz while secondary in control
+//delay(10);
+#if 0
+	SAMPLE_SIZE = GAGE_POST_64K;
+	INNO_Gage_ChanAB_setup(0.15);	// Only do it when SAMPLE_SIZE is diff from previous. 
+
+	pv3_4->set_voltage(45.0, RANGE_100_V);	//32V is good for Size8.  Not sure about other FET size.
+	wait.delay_10_us(20);
+
+	ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	//needed here to make sure FB start out High.
+	wait.delay_10_us(3);
+
+	RxTx_CycReq_cnt = 100;	//Total number of requested counts from FB on secondary side
+
+	//** RxTx_BPS_Hi_cnt **
+
+	//BPS set to vBPS_plus + 50mV to ensure communication between primary and secondary is good
+	BPS_dvi->set_voltage(BPS_ch, gVBPS_P_Init + 0.05, 	VOLT_10_RANGE);	// DVI_9_1
+	wait.delay_10_us(50);
+	// This is needed for the test to be more consistent because of the 1st pulse is sometime got ignored in the search algorithm
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_start+200);
+	wait.delay_10_us(3);
+
+	//Start capture.
+	Gage_Start_Capture(  );
+	CsDo(hSystem, ACTION_FORCE);	//Force capture.
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(105);
+
+	Gage_Wait_For_Capture_Complete();
+
+//	DEBUG=1;
+	WAVE_NAME =  "RxTx_BPS_Hi_cnt";
+	Gage_Count_Cycles(&RxTx_Hi_BPS_Low_Rcv);
+//	DEBUG=0;
+
+	//** RxTx_Lo_BPS_Low_Rcv **
+
+	//BPS set to 4.0V to ensure communication between primary and secondary is good
+//	BPS_dvi->set_voltage(BPS_ch, gVBPS_M_Init+50e-3, 					VOLT_10_RANGE);	// DVI_9_1
+	BPS_dvi->set_voltage(BPS_ch, 4.0, 					VOLT_10_RANGE);	// DVI_9_1
+	wait.delay_10_us(10);
+	// This is needed for the test to be more consistent because of the 1st pulse is sometime got ignored in the search algorithm
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_start+200);
+	wait.delay_10_us(3);
+	
+	//** Vpin low -> standard receiver threshold **
+
+
+	//Force capture
+	Gage_Start_Capture(  );
+	CsDo(hSystem, ACTION_FORCE);	//Force capture.
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(105);
+
+	Gage_Wait_For_Capture_Complete();
+
+	WAVE_NAME =  "RxTx_Lo_BPS_Low_Rcv";
+	//Count Cycles (process gage data)
+	Gage_Count_Cycles(&RxTx_Lo_BPS_Low_Rcv);
+	//*******************************************************************************************************
+	//********* Receiver and Transmitter sanity check STOP **************************************************
+	//*******************************************************************************************************
+#endif
+	//PV3 Stop supply current 
+	pv3_4->set_current(0.0, RANGE_10_A);			// Time=1e3*7e-3*(Vcap-(userV+5V))/userI; max C*U/I = 369mS
+	pv3_4->set_voltage(0.0, RANGE_100_V);
+	wait.delay_10_us(10);
+
+	pv3_4->drive_off();	
+
+	//Power Down
+	//Disconnect_InvSyn_IM();  //HL Do not disconnect Inv ckt before powerdown other resources.
+	Power_Down_Everything();
+	Open_All_Relays();
+	Disconnect_InvSyn_IM();
+	delay(1);
+
+#if 1
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_HiBPS_Lorcv-  With High BPS at 4.4V.
+// 
+// In test mode 1, the receiver threshold can be changed by changing the Vpin level. 
+// With Vpin low, the receiver threshold is standard.
+// With Vpin high, the receiver threshold is increased by 5mV. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//pulse.do_pulse();
+	SAMPLE_SIZE = GAGE_POST_64K;
+	RxTx_CycReq_cnt = 100;	//Total number of requested counts from FB on secondary side
+	
+	// Setup Digitizer //
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	//	Set up Buffer Clamp
+	BC_ovi->set_current(BC_ch, 30e-3,		RANGE_30_MA);
+	BC_ovi->set_voltage(BC_ch, (ChB_vrng-0.6),VOLT_5_RANGE);	// OVI_1_3 Account for one diode drop
+	delay(1);
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			1.0,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	delay(2);
+
+	VBPP_Negative_Cycle();
+	if (OPCODE==4400)
+	{
+		BPP_ovi->set_current(BPP_ch, 3e-3,		RANGE_3_MA);
+		BPP_ovi->set_voltage(BPP_ch, 0.0, 		RANGE_10_V);	// OVI_1_0 
+		wait.delay_10_us(5);
+		BPP_ovi->set_voltage(BPP_ch, -1.0, 		RANGE_10_V);	// OVI_1_0 
+		delay(1);	
+		BPP_ovi->set_voltage(BPP_ch, 0.0, 		RANGE_10_V);	// OVI_1_0 
+		wait.delay_10_us(10);
+	}
+
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);	// DVI_11_0
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);	// DVI_11_0
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+	Close_relay(K10); // Connect drain to RDS buffer circuit to digitize drain waveform. //
+	delay(3);
+
+	
+	//PROG mode to program out XFWPK bit to disable FWPK switching.
+	// Also Program out the External FB option
+
+	Powerup_Secondary_in_Testmode(gProgRead_AFreg_S, 0, 0);
+	wait.delay_10_us(20);
+
+	if(OPCODE==4200 || OPCODE==4250)
+	{
+		if(g_TurretCB)
+		{
+			BPS_dvi->set_voltage(BPS_ch, gVBPS_final+50e-3,	VOLT_10_RANGE);			
+		}
+		else
+		{
+			//BPS_dvi->set_voltage(BPS_ch, gVBPS_final+50e-3,	VOLT_10_RANGE);	
+			BPS_dvi->set_voltage(BPS_ch, gVBPS_final,	VOLT_10_RANGE);
+		}
+	}
+	else //HOT temperature 125C
+	{
+		BPS_dvi->set_voltage(BPS_ch, gVBPS_final+50e-3,	VOLT_10_RANGE);	
+	}
+	
+	wait.delay_10_us(20);
+
+	//Read/write AF register
+	Close_relay(K26);	//SR to DDD-7-5
+	delay(5);
+	//DEBUG=1;
+	Read_Secondary_AF_Reg (SR_AF_temp);	//must be followed by write
+	//MINNO Trim bits
+	//Write corrected bits into AF register
+	SR_AF_temp[5]=0;	// Programming out PK1&Xspeedload
+	SR_AF_temp[6]=0;	// Programming out PK2
+	SR_AF_temp[7]=0;	// Programming out PK3
+	SR_AF_temp[22]=0;	// Programming out PKdig<1>
+	SR_AF_temp[23]=0;	// Programming out PKdig<2>
+	SR_AF_temp[24]=0;	// Programming out PKdig<3>
+	SR_AF_temp[25]=0;	// Programming out PKdig<4>
+	SR_AF_temp[42]=1;	// Programming in  DOPL
+	SR_AF_temp[44]=1;	// Programming in  FWPK
+	Write_Secondary_AF_Reg (SR_AF_temp);
+	wait.delay_10_us(20);
+
+	Open_relay(K18);
+	Open_relay(K21);
+	Open_relay(K27);
+	delay(3);
+
+	//HL added.  Without VO=0V, VO will be pulled below ground and clamped by the ESD diode.	
+	VO_dvi->set_current(VO_ch, 0.1e-3,	RANGE_300_MA);	
+	VO_dvi->set_voltage(VO_ch, 0.5, 		VOLT_5_RANGE);	// DVI_9_0  RLB
+	wait.delay_10_us(20);
+	VO_dvi->set_voltage(VO_ch, 5.0, 		VOLT_5_RANGE);	// HL. VO=5V per agreement with Hiep.
+	wait.delay_10_us(20);
+
+	////08/30/17.  D = 0V before connecting Inv sync ckt to fix repeatability issue.
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+	wait.delay_10_us(20);
+
+	REQ_ovi->set_voltage(REQ_ch, gCV_Low,	RANGE_2_V);	// OVI_1_2	
+	//REQ_ovi->set_voltage(REQ_ch, 0.9,	RANGE_2_V);	// OVI_1_2	
+	wait.delay_10_us(50);
+	
+	Connect_InvSyn_IM(Low_Load_Vd_Input);		//FB (2V)  pull FB above CVth to force No Switching
+	//InvSyn_REF_ovi->set_voltage(InvSyn_ch, -6.0,		VOLT_20_RANGE);
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,		VOLT_20_RANGE);//Added on 11/02/18 to improve stability
+	//RS Note:  Vinminus varies from -2.0V to -3.0V, so setting Vinplus = -2.50v should be good for size 2.
+    //ET Note:  Vinminus varies from -2.1V to -3.2V, so setting Vinplus = -2.75v should be good for size 2.
+	//          ET has repeatability issue with Vinplus = -2.5V, but okay with -2.25V. 
+	/*if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -4.5,		VOLT_20_RANGE);
+
+	}
+	else
+	{
+		if(LB_Rev==7)	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 0.50,		VOLT_20_RANGE);		
+		else			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -5.0,		VOLT_20_RANGE);		
+	}*/
+
+
+	
+	delay(1);
+	if(LB_Rev >= 5||g_TurretCB)			ddd_7->ddd_set_hi_level(1.7);
+	else								ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	
+	ddd_7->ddd_set_lo_level(0.9);								// Will immediately change to this level upon execution
+	delay(1);
+//pulse.do_pulse();
+	ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	wait.delay_10_us(50);
+	//Setup FB to connect to DDD
+	Close_relay(K17);	//FB   to   DDD
+	delay(5);
+
+	/*if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -4.5,		VOLT_20_RANGE);
+
+	}
+	else
+	{
+		if(OPCODE==4200||OPCODE==4250)
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -5.0,		VOLT_20_RANGE);	
+		else
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -5.0,		VOLT_20_RANGE);
+	}*/
+
+	VBPP_Power_Up_w_Test_Mode(gTM1_p,ILIM_NORM);
+	D_dvi->set_voltage(D_ch, 1.5, 		VOLT_50_RANGE);	// DVI_11_0	
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, -5.0,		VOLT_20_RANGE);//Added on 11/02/18 to improve stability
+	
+	delay(4);	// Wait and Listen time in TM1. Hiep adjusted from 3ms to 4ms.
+	// Run 100kHz clocks to avoid the Primary going into Overload Freq.
+//pulse.do_pulse();
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	if(gSiliconRev_P>=3)
+	{
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 50e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(20);
+	}
+
+		//pulse.do_pulse();
+	Gage_Start_Capture(  );
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+//pulse.do_pulse();
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(120);
+	Gage_Wait_For_Capture_Complete();
+
+	
+	// Running continuous FB clocks at 100kHz to avoid Sec gives up control
+	//ddd_7->ddd_end_pattern(FB_100kHz_loop_pulse_stop);
+	//wait.delay_10_us(10);
+	//ddd_7->ddd_run_pattern();
+	////wait.delay_10_us(50);
+
+	if(gSiliconRev_P>=3)
+	{
+
+		VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		delay(2);
+
+	}
+	//DEBUG=1;
+	//MYtempVar = 1; // Debug only. //
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Hi_BPS_Low_Rcv_cnt";
+
+	Gage_Count_Cycles_CHB(&RxTx_Hi_BPS_Low_Rcv);
+	/*ddd_7->ddd_stop_pattern();*/
+	//wait.delay_10_us(10);
+	//pulse.do_pulse();
+	//DEBUG=0;
+
+	if(gSiliconRev_P>=3)
+	{
+
+		//VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		//delay(2);
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_P_s_final, 5.0, 50e-3); //BPP ramp up from 0 to 5V with 100mV step
+		delay(2);
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 50e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(20);
+	}
+
+	//DEBUG=0;
+	//MYtempVar = 0; // Debug only. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_LoBPS_Lorcv-  With Low BPS at VBPS_M+100mV
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+
+	if(g_TurretCB)
+	{
+		VBPS_ramp_down(gVBPS_final, gVBPS_M_Init + 150e-3, 50e-3);
+	}
+	else
+	{
+		VBPS_ramp_down(gVBPS_final, gVBPS_M_Init + 100e-3, 50e-3);
+		//VBPS_ramp_down(gVBPS_final, 3.85, 50e-3);
+	}
+	wait.delay_10_us(10);	// Dont wait for too long here, secondary might loose control
+	ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	wait.delay_10_us(10);
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Start_Capture(  );
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Wait_For_Capture_Complete();
+	if(gSiliconRev_P>=3)
+	{
+
+		VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		delay(2);
+
+	}
+
+	//// Running continuous FB clocks at 100kHz to avoid Sec gives up control	
+	//ddd_7->ddd_end_pattern(FB_100kHz_loop_pulse_stop);
+	//wait.delay_10_us(10);
+	//ddd_7->ddd_run_pattern(); // Need to do a stop pattern when you don't want ddd looping /
+
+	//MYtempVar = 1; // Debug only. //
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Lo_BPS_Low_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Lo_BPS_Low_Rcv);
+	/*ddd_7->ddd_stop_pattern();*/
+	wait.delay_10_us(10);
+	//DEBUG=0;
+	//MYtempVar = 0; // Debug only. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_HiBPS_Hircv-  With High BPS at 4.4
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+		if(gSiliconRev_P>=3)
+			{
+
+		//VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		//delay(2);
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_P_s_final, 5.0, 50e-3); //BPP ramp up from 0 to 5V with 100mV step
+		delay(2);
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 50e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(20);
+	}
+
+	if(g_TurretCB)
+	{
+		VBPS_ramp_up(gVBPS_M_Init + 150e-3, gVBPS_final+150e-3, 50e-3);
+	}
+	else
+	{
+		if(OPCODE==4200 || OPCODE==4250)
+			VBPS_ramp_up(gVBPS_M_Init + 100e-3, gVBPS_final, 50e-3);        //HL changed the stepsize from 20mV to 50mV
+			//VBPS_ramp_up(gVBPS_M_Init + 100e-3, 4, 50e-3); 
+		else
+			VBPS_ramp_up(gVBPS_M_Init + 100e-3, gVBPS_final+100e-3, 50e-3); //HL added 100mV due to hot failure.
+		
+	}
+	wait.delay_10_us(10);	// Dont wait for too long here, secondary might loose control
+	// Bring up Vpin. //
+	// Vpin must be high to enable the elevated receiver threshold.  With Vpin 
+	// low, the receiver threshold is standard.  With Vpin high, the receiver 
+	// threshold is increased by 5mV. // 
+	VPIN_ovi->set_voltage(VPIN_ch, 5.0, RANGE_10_V);
+	wait.delay_10_us(10);	// Dont wait for too long here, secondary might loose control
+	ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	wait.delay_10_us(10);
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Start_Capture(  );
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Wait_For_Capture_Complete();
+
+	if(gSiliconRev_P>=3)
+	{
+
+		VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		delay(2);
+	}
+
+	//// Running continuous FB clocks at 100kHz to avoid Sec gives up control	
+	//ddd_7->ddd_end_pattern(FB_100kHz_loop_pulse_stop);
+	//wait.delay_10_us(10);
+	//ddd_7->ddd_run_pattern(); // Need to do a stop pattern when you don't want ddd looping //
+
+	//MYtempVar = 1; // Debug only. //
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Hi_BPS_High_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Hi_BPS_High_Rcv);
+	//ddd_7->ddd_stop_pattern();
+	wait.delay_10_us(10);
+	//DEBUG=0;
+	//MYtempVar = 0; // Debug only. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_LoBPS_Hircv-  With Low BPS at VBPS_M+100mV
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	if(gSiliconRev_P>=3)
+	{
+
+		//VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		//delay(2);
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_P_s_final, 5.0, 50e-3); //BPP ramp up from 0 to 5V with 100mV step
+		delay(2);
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 50e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(20);
+	}
+	if(g_TurretCB)
+	{
+		VBPS_ramp_down(gVBPS_final, gVBPS_M_Init + 150e-3, 20e-3);
+	}
+	else
+	{
+		VBPS_ramp_down(gVBPS_final, gVBPS_M_Init + 100e-3, 50e-3);
+		//VBPS_ramp_down(gVBPS_final, 3.85, 50e-3);
+	}
+	wait.delay_10_us(10);	// Dont wait for too long here, secondary might loose control
+	ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	wait.delay_10_us(10);
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Start_Capture(  );
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Wait_For_Capture_Complete();
+
+	//MYtempVar = 1; // Debug only. //
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Lo_BPS_High_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Lo_BPS_High_Rcv);
+	//DEBUG=0;
+	//MYtempVar = 0; // Debug only. //
+
+	//ddd_7->ddd_set_clock_period(0.25e-6);		
+	//delay(1);
+
+	//Power Down
+	//Disconnect_InvSyn_IM();  //HL Do not disconnect Inv ckt before powerdown other resources.
+	Power_Down_Everything();
+	Open_All_Relays();
+	Disconnect_InvSyn_IM();
+	if(g_TurretCB)
+	{
+		tmu_6->open_relay(TMU_EXT_DRV3);
+		delay(2);
+	}
+
+
+#endif
+
+
+#if 0
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_HiBPS_Lorcv-  With High BPS at 4.4V.
+// 
+// In test mode 1, the receiver threshold can be changed by changing the Vpin level. 
+// With Vpin low, the receiver threshold is standard.
+// With Vpin high, the receiver threshold is increased by 5mV. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+
+	SAMPLE_SIZE = GAGE_POST_64K;
+	RxTx_CycReq_cnt = 100;	//Total number of requested counts from FB on secondary side
+	
+	// Setup Digitizer //
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	//	Set up Buffer Clamp
+	BC_ovi->set_current(BC_ch, 30e-3,		RANGE_30_MA);
+	BC_ovi->set_voltage(BC_ch, (ChB_vrng-0.6),VOLT_5_RANGE);	// OVI_1_3 Account for one diode drop
+	delay(1);
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			1.0,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	delay(2);
+
+	VBPP_Negative_Cycle();
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);	// DVI_11_0
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);	// DVI_11_0
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+	Close_relay(K10); // Connect drain to RDS buffer circuit to digitize drain waveform. //
+	delay(5);
+//
+	SyncHS_PowerUp_Secondary_in_Test_Mode(gTM1_p,ILIM_NORM);	//Expect device to switch ON ~2.2ms, OFF ~62ms
+	//SyncHS_PowerUp_Secondary_in_Test_Mode(gTM5_BypassWL_p,ILIM_NORM);	//Expect device to switch ON ~2.2ms, OFF ~62ms
+	delay(3);
+
+	//if(MOSFET_SIZE==5)		InvSyn_REF_ovi->set_voltage(InvSyn_ch, 3.0,		VOLT_20_RANGE);	// OVI_1_4	
+	//else						InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.5,		VOLT_20_RANGE);	// OVI_1_4	
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.5,		VOLT_20_RANGE);	// OVI_1_4	
+
+	wait.delay_10_us(10);
+
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0, RANGE_10_V);	//revE LB is 5V
+	wait.delay_10_us(5);
+	//VO, external FB parts
+	if (gTrim_VR_S == 0)
+		VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0
+	//VO, internal FB parts
+	if (gTrim_VR_S == 1)
+		VO_dvi->set_voltage(VO_ch, 2.5, 		VOLT_5_RANGE);	// DVI_9_0
+	wait.delay_10_us(10);
+	// Get FB ready for clocking. //
+	ddd_7->ddd_set_lo_level(gCV_Low);
+	if(g_TurretCB)
+	{
+		ddd_7->ddd_set_hi_level(gCVth_10pct_Higher+0.05);
+	}
+	else
+	{
+		if(LB_Rev >= 5)			ddd_7->ddd_set_hi_level(gCVth_15pct_Higher); //8% instead of 5%
+		else					ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	}
+	//ddd_7->ddd_set_hi_level(gCVtgt_15pct_Higher);
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(50);		
+	//Setup FB to connect to DDD //
+	Close_relay(K17); // Connect FB to DD //	
+	delay(5);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(10);		
+
+	Gage_Start_Capture(  );
+
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Wait_For_Capture_Complete();
+
+	//MYtempVar = 1; // Debug only. //
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Hi_BPS_Low_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Hi_BPS_Low_Rcv);
+	//MYtempVar = 0; // Debug only. //
+	//Power Down
+	Power_Down_Everything();
+	Open_All_Relays();
+
+	// Buffer clamp needs to be reconnected //
+	//INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_LoBPS_LRcv-  With BPS at 4V.
+//	Gage Channel B
+// In test mode 1, the receiver threshold can be changed by changing the Vpin level. 
+// With Vpin low, the receiver threshold is standard.  With Vpin high, the receiver 
+// threshold is increased by 5mV. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	//	Set up Buffer Clamp
+	BC_ovi->set_current(BC_ch, 30e-3,		RANGE_30_MA);
+	BC_ovi->set_voltage(BC_ch, (ChB_vrng-0.6),VOLT_5_RANGE);	// OVI_1_3 Account for one diode drop
+	delay(1);
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			1.0,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	delay(2);
+
+	VBPP_Negative_Cycle();
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);	// DVI_11_0
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);	// DVI_11_0
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+	Close_relay(K10); // Connect drain to RDS buffer circuit to digitize drain waveform. //
+	delay(5);
+	SyncHS_PowerUp_Secondary_in_Test_Mode(gTM1_p,ILIM_NORM);	//Expect device to switch ON ~2.2ms, OFF ~62ms
+	delay(3);
+
+	//HL:  SC1538 failed with InvSync sets to 1.5V.  Changed for size 8 only.
+	if(OPCODE==4200 ||OPCODE==4250)
+	{
+		if(MOSFET_SIZE == 8 && g_TurretCB)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.5,        VOLT_20_RANGE);    // HL
+			wait.delay_10_us(10);
+		}
+	}
+	
+
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0, RANGE_10_V);	//revE LB is 5V though
+	wait.delay_10_us(5);
+	//VO, external FB parts
+	if (gTrim_VR_S == 0)
+		VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0
+	//VO, internal FB parts
+	if (gTrim_VR_S == 1)
+		VO_dvi->set_voltage(VO_ch, 2.5, 		VOLT_5_RANGE);	// DVI_9_0
+	wait.delay_10_us(5);
+//	// BPS set to 4.0V to ensure communication between primary and secondary is good //
+	// Temporarily set BPS to be in between the Plus and Minus threshold for data collection.
+	// At BPS 4V, device is intermittent.
+	VBPS_ramp_down(4.4, gVBPS_M_Init + 100e-3, 10e-3);
+	wait.delay_10_us(50);
+	// Get FB ready for clocking. //
+	ddd_7->ddd_set_lo_level(gCV_Low);
+	////if(g_TurretCB)
+	////{
+	////	ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	////}
+	////else
+	////{
+	////	if(LB_Rev >= 5)		ddd_7->ddd_set_hi_level(gCVth_8pct_Higher); //8% instead of 5%
+	////	else				ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	////}
+	////delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(50);		
+	//Setup FB to connect to DDD //
+	Close_relay(K17); // Connect FB to DD //	
+	delay(5);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(10);
+
+	//Gage_Start_Capture, RxTx_LoBPS
+	Gage_Start_Capture(  );
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+
+	Gage_Wait_For_Capture_Complete();
+
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Lo_BPS_Low_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Lo_BPS_Low_Rcv);
+	//MYtempVar=0;
+	
+	//Power Down
+	Power_Down_Everything();
+	Open_All_Relays();
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_HiBPS_HRcv-  With BPS at 4.4V.
+//	Gage Channel B
+// In test mode 1, the receiver threshold can be changed by changing the Vpin level. 
+// With Vpin low, the receiver threshold is standard.  With Vpin high, the receiver 
+// threshold is increased by 5mV. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	// Setup Digitizer //
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	//	Set up Buffer Clamp
+	BC_ovi->set_current(BC_ch, 30e-3,		RANGE_30_MA);
+	BC_ovi->set_voltage(BC_ch, (ChB_vrng-0.6),VOLT_5_RANGE);	// OVI_1_3 Account for one diode drop
+	delay(1);
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			1.0,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	delay(2);
+
+	VBPP_Negative_Cycle();
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);	// DVI_11_0
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);	// DVI_11_0
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+	Close_relay(K10); // Connect drain to RDS buffer circuit to digitize drain waveform. //
+	delay(5);
+	SyncHS_PowerUp_Secondary_in_Test_Mode(gTM1_p,ILIM_NORM);	//Expect device to switch ON ~2.2ms, OFF ~62ms
+	delay(3);
+	//HL:  SC1537 failed with InvSync sets to 1.5V.  Changed for size 8 only.
+	if(OPCODE==4200 ||OPCODE==4250)
+	{
+		if(MOSFET_SIZE == 8 && g_TurretCB)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.5,        VOLT_20_RANGE);    // HL
+			wait.delay_10_us(10);
+		}
+	}
+	
+	// Bring up Vpin. //
+	// Vpin must be high to enable the elevated receiver threshold.  With Vpin 
+	// low, the receiver threshold is standard.  With Vpin high, the receiver 
+	// threshold is increased by 5mV. // 
+	VPIN_ovi->set_voltage(VPIN_ch, 5, RANGE_10_V);
+	wait.delay_10_us(5);
+	//VO, external FB parts
+	if (gTrim_VR_S == 0)
+		VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0
+	//VO, internal FB parts
+	if (gTrim_VR_S == 1)
+		VO_dvi->set_voltage(VO_ch, 2.5, 		VOLT_5_RANGE);	// DVI_9_0
+	wait.delay_10_us(5);
+
+	// Get FB ready for clocking. //
+	ddd_7->ddd_set_lo_level(gCV_Low);
+	////if(g_TurretCB)
+	////{
+	////	ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	////}
+	////else
+	////{
+	////	if(LB_Rev >= 5)			ddd_7->ddd_set_hi_level(gCVth_8pct_Higher);
+	////	else					ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	////}
+	////delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(0);		
+	//Setup FB to connect to DDD //
+	Close_relay(K17); // Connect FB to DD //	
+	delay(5);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(10);		
+
+	Gage_Start_Capture(  );
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+	Gage_Wait_For_Capture_Complete();
+
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Hi_BPS_High_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Hi_BPS_High_Rcv);
+	//MYtempVar = 0; // Debug only. //
+	//Power Down
+	Power_Down_Everything();
+	Open_All_Relays();
+	Disconnect_InvSyn_IM();
+
+	// Buffer clamp needs to be reconnected //
+	//INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+//  RxTx_LoBPS_HRcv-  
+//	Gage Channel B
+//	With BPS at 4V.
+//	BPS is actual at (gVBPS_P_Init+gVBPS_M_Init)/2 instead of 4.0V.
+// In test mode 1, the receiver threshold can be changed by changing the Vpin level. 
+// With Vpin low, the receiver threshold is standard.  With Vpin high, the receiver 
+// threshold is increased by 5mV. //
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	//	Set up Buffer Clamp
+	BC_ovi->set_current(BC_ch, 30e-3,		RANGE_30_MA);
+	BC_ovi->set_voltage(BC_ch, (ChB_vrng-0.6),VOLT_5_RANGE);	// OVI_1_3 Account for one diode drop
+	delay(1);
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			1.0,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	delay(2);
+
+	VBPP_Negative_Cycle();
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);	// DVI_11_0
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);	// DVI_11_0
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+	Close_relay(K10); // Connect drain to RDS buffer circuit to digitize drain waveform. //
+	delay(5);
+//
+	SyncHS_PowerUp_Secondary_in_Test_Mode(gTM1_p,ILIM_NORM);	//Expect device to switch ON ~2.2ms, OFF ~62ms
+	delay(3);
+	//HL:  SC1537 failed with InvSync sets to 1.5V.  Changed for size 8 only.
+	if(OPCODE==4200 ||OPCODE==4250)
+	{
+		if(MOSFET_SIZE == 8 && g_TurretCB)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.5,        VOLT_20_RANGE);    // HL
+			wait.delay_10_us(10);
+		}
+	}
+	
+
+	// Bring up Vpin. //
+	// Vpin must be high to enable the elevated receiver threshold.  With Vpin 
+	// low, the receiver threshold is standard.  With Vpin high, the receiver 
+	// threshold is increased by 5mV. // 
+	VPIN_ovi->set_voltage(VPIN_ch, 5.0, RANGE_10_V);
+	wait.delay_10_us(50);
+	//VO, external FB parts
+	if (gTrim_VR_S == 0)
+		VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0
+	//VO, internal FB parts
+	if (gTrim_VR_S == 1)
+		VO_dvi->set_voltage(VO_ch, 2.5, 		VOLT_5_RANGE);	// DVI_9_0
+	wait.delay_10_us(5);
+//	// BPS set to 4.0V to ensure communication between primary and secondary is good //
+	// Temporarily set BPS to be in between the Plus and Minus threshold for data collection.
+	// At BPS 4V, device is intermittent.
+	VBPS_ramp_down(4.4, gVBPS_M_Init+100e-3, 10e-3);
+	wait.delay_10_us(50);
+	// Get FB ready for clocking. //
+	ddd_7->ddd_set_lo_level(gCV_Low);
+	////if(LB_Rev >= 5||g_TurretCB)		ddd_7->ddd_set_hi_level(gCVth_8pct_Higher); //8% instead of 5%
+	////else							ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+	////delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(50);
+	//Setup FB to connect to DDD //
+	Close_relay(K17); // Connect FB to DD //	
+	delay(5);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(10);
+
+	Gage_Start_Capture(  );
+
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+	wait.delay_10_us(150);
+
+	Gage_Wait_For_Capture_Complete();
+
+	//Count Cycles (process gage data)
+	WAVE_NAME =  "RxTx_Lo_BPS_High_Rcv_cnt";
+	//DEBUG=1;
+	Gage_Count_Cycles_CHB(&RxTx_Lo_BPS_High_Rcv);
+	//MYtempVar=0;
+#endif	
+	//Power Down
+	Power_Down_Everything();
+	Open_All_Relays();
+	
+	// Buffer clamp needs to be reconnected //
+	INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+	wait.delay_10_us(10);
+/********************************************************************************
+ *							ILIM_P1: Secondary Control (ZF-P MUST TRIMMED)    *	
+ ********************************************************************************/
+if(gTrim_iLselOff_P==0)	
+{
+	ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+	wait.delay_10_us(10);
+
+	Close_relay(K3);	//Drain to L1 to 50ohm to K2NC to K1NC to DVI-11-0 (delay is inside power-up)
+	delay(5);
+	//if(REL_FLOW)	delay(g_REL_dly);	//delay needed to get the correct ILIM reading
+#if 0
+	//
+	VBPP_Negative_Cycle();
+	
+	if(g_TurretCB)
+	{
+		//HL needs to change to 20mA or Turret CB won't work.
+		SR_dvi2k->set_current(SR_ch, 0.0e-6,	RANGE_2_UA);	
+		SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+		delay(2);
+		mux_20->close_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+		delay(2);
+	}
+	
+
+	//Setup Vpin for digital clocking
+		ovi_1->disconnect(OVI_CHANNEL_1);	
+	// Initialize DDD
+		ddd_7->ddd_set_lo_level(0.1);		// Will immediately change to this level upon execution 
+		ddd_7->ddd_set_hi_level(4.0);		// Will immediately change to this level upon execution
+		delay(1);
+		ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		wait.delay_10_us(10);
+		Close_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	//Setup FB to connect to DDD
+		REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);	// OVI_1_2	
+		wait.delay_10_us(5);
+		Close_relay(K17);
+		delay(4);
+	//Have InvSync circuit ready for communication
+		Connect_InvSyn_IM(Low_Vd_Input);
+	//Primary Power up with TM2 and TM5 in same power up
+		D_dvi->set_current(D_ch, 300e-3,	RANGE_300_MA);		
+		D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+		wait.delay_10_us(20);
+		BPP_ovi->set_current(BPP_ch, 30e-3,	RANGE_30_MA);
+		VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+		wait.delay_10_us(20);
+		Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+		wait.delay_10_us(10);
+		dvi_11->set_voltage(DVI_CHANNEL_0, 40.0, VOLT_50_RANGE);	//be able to see AF links properly
+		wait.delay_10_us(50);
+
+		VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);		
+
+		D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+		wait.delay_10_us(5);
+		VBPP_ramp_down(gVBPP_PV_final, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+		wait.delay_10_us(150);	//10  uF	(ILIM+1)	1.2ms
+
+	//BPP set 4.5V for 100us and 5.2V to bring chip back to normal operation
+		ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_M_Init-200e-3, RANGE_10_V);
+		wait.delay_10_us(50);
+			if(gSiliconRev_P >= 3)
+			{
+				BPP_ovi->set_current(BPP_ch, 2e-3,	RANGE_30_MA);		//						B3 material
+				VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+				wait.delay_10_us(10);
+			}
+			else
+			{
+				ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_final, RANGE_10_V);
+				wait.delay_10_us(30);
+			}
+	//Drain set to 5V for switching
+		dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+		wait.delay_10_us(20);
+
+	//Bring Vpin OVI back
+		ovi_1->connect(OVI_CHANNEL_1);	
+		wait.delay_10_us(20);
+		VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+		VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+		wait.delay_10_us(50);
+		Open_relay(K12);
+		delay(1);
+				
+		if(LB_Rev >= 5||g_TurretCB)		ddd_7->ddd_set_hi_level(gCVth_15pct_Higher); //8% instead of 5%
+		else							ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+		delay(1);
+		ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+		wait.delay_10_us(5);		
+
+		//SR (0V)	(Requires dead short.  DVI-2k is not responding fast enough that SR could have pull-up and back to ground)
+		//			(We just can't see it from the scope.  So, try to short this from BUS3 through MUX_GND)
+		SR_dvi2k->set_current(SR_ch, 20e-3,			RANGE_2_A);	
+		SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+		delay(2);
+		mux_20->close_relay(MUX_1_1);
+		delay(2);
+		dvi_13->close_relay(BUS_SENSE1);
+		dvi_13->close_relay(BUS_FORCE1);
+		mux_14->close_relay(MUX_3_BUS3);
+		delay(3);
+		
+		
+
+		//Vout (0V)
+		VO_dvi->set_current(VO_ch, 300.0e-3,	RANGE_300_MA);	
+		VO_dvi->set_voltage(VO_ch, 4.4, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+
+		//IS (0V)
+		FWC_dvi2k->set_voltage(FWC_ch, 0.0,		VOLT_2_RANGE);	// DVI_21_0 (20mV) above ground so it's not short to GND (take care of SCEN bit)
+		FWC_dvi2k->set_current(FWC_ch, 20.0e-3,	RANGE_20_MA);
+		wait.delay_10_us(10);
+		//BPS (vPlus - 200mV)
+		BPS_dvi->set_current(BPS_ch, 300e-3,					RANGE_300_MA);	
+		VBPS_Power_Up(gVBPS_M_Init-0.2);			// vfinal  
+
+		BPS_dvi->set_voltage(BPS_ch, gVBPS_final, 	VOLT_10_RANGE);	// Secondary vBPS_plus
+		wait.delay_10_us(10);
+
+		if(gSiliconRev_P>=3)	//Lower BPP plus threshold correctly for Primary B3 silicon and later materials
+		{
+			BPP_ovi->set_voltage(BPP_ch, gVBPP_P_s_final, RANGE_10_V);
+			wait.delay_10_us(10);
+		}
+
+		//Bypass tSoft with FB purposely set high low high
+		delay(1);
+		//FB stop switching with FB set to gCVth_15pct_Higher
+		ddd_7->ddd_set_lo_level(gCV_Low);								// Will immediately change to this level upon execution
+		delay(1);
+		// Temporarily fix - to avoid the device going into FWPK switching. 2/13/17 HQL.
+		VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+		wait.delay_10_us(10);
+		ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		wait.delay_10_us(5);
+		ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+		wait.delay_10_us(5);
+
+	D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(5);
+
+	////if(gSiliconRev_S>=3)
+	//////Added for B3 material
+	////VBPP_ramp_down(gVBPP_P_final, 5.1, 50e-3);	// vstart, vstop, vstep	B3 material
+
+    InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,        VOLT_20_RANGE);    // Avoid noise coupling over to InvSynCircuit to FW
+    wait.delay_10_us(10); 
+
+	// Connect Inductor to Drain
+	Open_relay(K3);											// Drain to RL pullup
+	Close_relay(KIM1);										// Connect Vind to CT2+ to CT2-
+	Close_relay(K9);										// Connect CT2- to Drain
+	Close_relay(K1);			// Connect Iped to CT2+ to CT2-
+	if(OPCODE==4300 ||OPCODE==4500)
+	{
+		if(MOSFET_SIZE == 6 && LB_Rev >= 5)
+		{
+			Close_relay(KIM3);	
+		}
+		else
+		{
+			Open_relay(KIM3);	
+		}
+	}
+	else
+	{
+		Open_relay(KIM3);										// ILIM Pedestal Use resistor Rpd1 (100mA)
+	}
+	delay(4);
+
+	////FB set back to 0.8V 
+	//ddd_7->ddd_set_lo_level(gCV_Low);								// Will immediately change to this level upon execution
+
+//    InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,        VOLT_20_RANGE);    // cx 11/10/16
+    InvSyn_REF_ovi->set_voltage(InvSyn_ch, 4.0,        VOLT_20_RANGE);    // cx 11/10/16
+
+	// Setup Pedestal
+	D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+	D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+	D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+	wait.delay_10_us(50);
+
+	if(g_TurretCB)
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM+1.5); //Drive Voltage
+		wait.delay_10_us(1000);    
+	}
+	else
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+		wait.delay_10_us(1000);    
+	}
+
+	// Enable RTM by switch >110kHz for >200usec. //
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+
+//
+	//Gage_Start_Capture, ILIM_P1
+	Gage_Start_Capture(  );
+	wait.delay_10_us(5);
+	ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start_X,FB_100kHz_ILIM_pulse_stop_X);	
+	wait.delay_10_us(40);
+
+	Gage_Wait_For_Capture_Complete();
+#endif
+
+#if 1
+//
+	VBPP_Negative_Cycle();
+//Testing out Primary TM5 Bypass Wait and Listen, then TM2 for ILIM with "NO Jitter"  with Secondary Control
+
+
+	//Setup Vpin for digital clocking
+	ovi_1->disconnect(OVI_CHANNEL_1);	
+	delay(1);
+	// Initialize DDD
+	ddd_7->ddd_set_lo_level(0.1);		// Will immediately change to this level upon execution 
+	ddd_7->ddd_set_hi_level(4.0);		// Will immediately change to this level upon execution
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(10);
+	Close_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	delay(5);
+	//Primary Power up with TM2 and TM5 in same power up
+	D_dvi->set_current(D_ch, 300e-3,	RANGE_300_MA);		
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+	wait.delay_10_us(20);
+	BPP_ovi->set_current(BPP_ch, 30e-3,	RANGE_30_MA);
+	VBPP_ramp_up(0.0, 5.0, 0.2);	// vstart, vstop, vstep	
+	wait.delay_10_us(20);
+
+	Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+	wait.delay_10_us(10);
+
+	dvi_11->set_voltage(DVI_CHANNEL_0, 40.0, VOLT_50_RANGE);	//be able to see AF links properly
+	wait.delay_10_us(50);
+
+	VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);		
+
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0	
+	wait.delay_10_us(5);
+	VBPP_ramp_down(gVBPP_PV_final, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+	wait.delay_10_us(150);	//10  uF	(ILIM+1)	1.2ms
+
+	//BPP set 4.5V for 100us and 5.2V to bring chip back to normal operation
+	ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_M_Init-200e-3, RANGE_10_V);
+	wait.delay_10_us(50);
+
+	if(gSiliconRev_P >= 3)
+	{
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(10);
+	}
+	else
+	{
+		ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_final, RANGE_10_V);
+		wait.delay_10_us(30);
+	}
+
+//Bring Vpin OVI back
+	ovi_1->connect(OVI_CHANNEL_1);	
+	wait.delay_10_us(20);
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+	VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+	wait.delay_10_us(10);
+	Open_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	wait.delay_10_us(10);
+
+	//PROG mode to program out XFWPK bit to disable FWPK switching
+	// Also Program out the External FB option
+	Powerup_Secondary_in_Testmode(gProgRead_AFreg_S, 0, 0);
+	wait.delay_10_us(20);
+	BPS_dvi->set_voltage(BPS_ch, gVBPS_final,	VOLT_10_RANGE);			
+	wait.delay_10_us(20);
+
+	//Read/write AF register
+	Close_relay(K26);	//SR to DDD-7-5
+	delay(3);
+	//DEBUG=1;
+	Read_Secondary_AF_Reg (SR_AF_temp);	//must be followed by write
+	//MINNO Trim bits
+	//Write corrected bits into AF register
+	SR_AF_temp[5]=0;	// Programming out PK1&Xspeedload
+	SR_AF_temp[6]=0;	// Programming out PK2
+	SR_AF_temp[7]=0;	// Programming out PK3
+	SR_AF_temp[22]=0;	// Programming out PKdig<1>
+	SR_AF_temp[23]=0;	// Programming out PKdig<2>
+	SR_AF_temp[24]=0;	// Programming out PKdig<3>
+	SR_AF_temp[25]=0;	// Programming out PKdig<4>
+	SR_AF_temp[42]=1;	// Programming in  DOPL
+	SR_AF_temp[44]=1;	// Programming in  FWPK
+	Write_Secondary_AF_Reg (SR_AF_temp);
+
+	Open_relay(K18);
+	Open_relay(K21);
+	delay(1);
+
+	
+	////Keep D=0V to prevent repeatability issue due to lost communication.
+	//dvi_11->set_voltage(DVI_CHANNEL_0, 0.0, VOLT_50_RANGE);
+	//delay(1);
+
+	REQ_ovi->set_voltage(REQ_ch, gCV_Low, 		RANGE_5_V);	
+	wait.delay_10_us(10);
+	Connect_InvSyn_IM(Low_Load_Vd_Input);
+	if(gSiliconRev_P>=3)
+	{
+		//BPP_ovi->set_current(BPP_ch, 2e-3,	RANGE_30_MA);		//						B3 material
+		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 10e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(10);
+	}
+	//Drain set to 5V for switching
+	dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+	delay(1);
+		
+	//FB (2V)  pull FB above CVth to force No Switching
+	if(LB_Rev >= 5||g_TurretCB)		ddd_7->ddd_set_hi_level(1.7);
+	else							ddd_7->ddd_set_hi_level(gCVth_10pct_Higher);
+	ddd_7->ddd_set_lo_level(0.9);								// Will immediately change to this level upon execution
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(5);
+	Close_relay(K17);	//Setup FB to connect to DDD
+	delay(5);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(20);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(20);
+    InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,        VOLT_20_RANGE);    // Avoid noise coupling over to InvSynCircuit to FW
+    wait.delay_10_us(50); 
+
+	D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(50);
+	//Commented out code for MINNO
+	/*
+	//SR_dvi2k->set_current(SR_ch, 0.0e-6,	RANGE_2_UA);	
+	//SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+	//delay(2);
+	//mux_20->close_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+	//delay(2);
+	//dvi_13->close_relay(BUS_SENSE1);
+	//dvi_13->close_relay(BUS_FORCE1);
+	//mux_14->close_relay(MUX_3_BUS3);
+	//delay(3);
+	*/
+	//SR_dvi2k->open_relay(CONN_FORCE1);
+	//SR_dvi2k->open_relay(CONN_SENSE1);
+	//Close_relay(K5);//Connect SR to 5nF
+	//delay(2);
+	// Connect Inductor to Drain
+	Open_relay(K3);											// Drain to RL pullup
+	Close_relay(KIM1);										// Connect Vind to CT2+ to CT2-
+	Close_relay(K9);										// Connect CT2- to Drain
+	Close_relay(K1);			// Connect Iped to CT2+ to CT2-
+	//	Open_relay(K1);				// Connect Iped to CT2+ to CT2-
+	if ((strcmp("INN3466C-HZ99", Dev_id) == 0)||(strcmp("INN3467C-HZ99", Dev_id) == 0)||(strcmp("INN3467C-HZ98", Dev_id) == 0)||(strcmp("INN3468C-HZ99", Dev_id) == 0))// DLM ILIM evaluation experiment only, use Rped2
+		Close_relay(KIM3);	
+		//Open_relay(KIM3);  // ILIM Pedestal Use resistor Rpd2 (953mA)
+	else if (strcmp("INN3465C-HZ99", Dev_id) == 0)
+		Open_relay(KIM3);										// ILIM Pedestal Use resistor Rpd1 (100mA)
+	else if (MOSFET_SIZE==8 && gILIM_TARGET_S > 2.2)  //Use Rped2 for Minno 2400mA ILIM
+		Close_relay(KIM3);
+	else
+		Open_relay(KIM3);
+	
+	delay(4);
+
+  
+	//RS Note: Vinminus varies from -5.0v to 3.0V, so keeping vinplus = 1.5V should be good for size 2.
+    //ET Note: Vinminus varies from -4.5V to 0.7V, so keeping vinplus = -1.5 should be good for size 2.
+	if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -3.0,        VOLT_20_RANGE);    
+	}
+	else
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,        VOLT_20_RANGE);    
+	}
+    wait.delay_10_us(50);
+
+	// Setup Pedestal
+	D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+	D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+	D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+	wait.delay_10_us(50);
+
+	if(g_TurretCB)
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+	 
+	}
+	else
+	{
+		if(OPCODE==4300 ||OPCODE==4500)
+		{
+			if(MOSFET_SIZE == 6 && LB_Rev >= 5)
+			{
+				PV3_Connect_Drain_and_DriveON(Vind_RM+1.5); //Drive Voltage
+			}
+			else
+			{
+				PV3_Connect_Drain_and_DriveON(Vind_RM+2.0); //Drive Voltage- Compensate for HOT size 8 MINNO
+
+			}
+		}
+		else
+		{
+				PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+
+		}
+		wait.delay_10_us(1000);    
+	}
+
+	pulse.do_pulse();
+	// Enable RTM by switch >110kHz for >200usec. //
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	//////See that the initial request gave me lower ILIM and later request give me correct ILIM.  TEMPORARY ADD HERE. REQUIRE DE
+	////ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	////wait.delay_10_us(100);
+
+//////////
+	Gage_Start_Capture(  );
+//
+
+	//Setup to have ILIM switch for 18pulses, then OFF 30us, ON 10us, OFF 200us and ON for 3 pulses of 100kHz
+	ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start,FB_100kHz_ILIM_pulse_stop);
+	wait.delay_10_us(50);
+
+	Gage_Wait_For_Capture_Complete();
+
+	pv3_4->drive_off();	
+#endif
+
+	//DEBUG = 1;
+	// Process data
+	WAVE_NAME =  "ILIM_P1";
+	FIND_RDSON_Peak_FLAG = 0;
+	if(g_TurretCB)
+	{
+		Gage_Find_Ilim_Turret(&ILIM_P1_S, &DIDT_P1_S, &TON_P1_S, &Dummy_rdson_peak, &Dummy_rdson_spec);	
+
+	}
+	else
+	{
+		Gage_Find_Ilim(&ILIM_P1_S, &DIDT_P1_S, &TON_P1_S, &Dummy_rdson_peak, &Dummy_rdson_spec);	
+	}
+	//DEBUG = 0;
+
+	if(ILIM_P1_S < 1.5) // || ILIM_S > 2)	//DEBUG ONLY (THIS IS TO PREVENT BURNING THE IM
+	{
+		// Setup Pedestal
+		D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+		D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+	}
+
+	if(gTrim_iLselOff_P)
+		gIlim_Incr_max = gILIM_TARGET_S;
+	else
+	{
+		if(gDLM_Size <= 3)		gIlim_Incr_max = gILIM_TARGET_S+100e-3;	//Size x2,x3		+100mA
+		else					gIlim_Incr_max = gILIM_TARGET_S+300e-3;	//Size x4,5,6,7,8	+200mA, MINNO size x8
+	}
+
+	ILIM_P1_S_Err = (ILIM_P1_S/gIlim_Incr_max -1.0) * 100.0;
+
+	pv3_4->set_current(0.0, RANGE_10_A);			// Time=1e3*7e-3*(Vcap-(userV+5V))/userI; max C*U/I = 369mS
+	pv3_4->set_voltage(0.0, RANGE_100_V);
+	wait.delay_10_us(10);
+	pv3_4->drive_off();
+	delay(1);
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(100);
+
+
+
+/********************************************************************************
+ *				Rdson at ILIM_P1 peak:	Secondary control					*					
+ ********************************************************************************/
+	// Bring back Vout to avoid device going into AR.
+	if(g_TurretCB)
+	{
+		VO_dvi->set_voltage(VO_ch, 5.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+
+	}
+	else
+	{
+		VO_dvi->set_voltage(VO_ch, 4.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+	}
+	wait.delay_10_us(10);
+	InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,		VOLT_20_RANGE);	// Higher for hot test
+	wait.delay_10_us(10);
+	Close_relay(K10);			//Drain to Rdson Buffer
+	delay(4);
+
+	//RS Note:  Vinminus varies from 1.8V to -4.85V, so setting Vinplus to 1V should be good for size 2.
+    //ET Note:  Vinminus varies from 0.2V to -4.50V, so setting Vinplus to -1.5V should be good for size 2.
+	if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -3.0,	VOLT_20_RANGE);	// Higher for hot test
+		wait.delay_10_us(200);
+	}
+	else
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, 2.0,		VOLT_20_RANGE);	// Higher for hot test (used to be 3.0V for LBRev7)
+		wait.delay_10_us(200);
+	}
+	
+
+	D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+	D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+	D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+	wait.delay_10_us(50);
+	
+	if(g_TurretCB)
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM+0.5); //Drive Voltage
+	   
+	}
+	else
+	{
+		PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+	}
+	// Temporarily fix - to avoid the device going into FWPK switching. 2/13/17 HQL.
+	VO_dvi->set_voltage(VO_ch, 0.0, 		VOLT_5_RANGE);	// DVI_9_0  "If Vout bring high, this will bring vBPS high"
+	wait.delay_10_us(10);
+
+	// Enable RTM by switch >110kHz for >200usec. //
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+	ddd_7->ddd_run_pattern(FB_125kHz_pulse_start_X,FB_125kHz_pulse_stop_X);	
+	wait.delay_10_us(60);
+//pulse.do_pulse();
+	//Gage_Start_Capture, ILIM_P1
+	Gage_Start_Capture(  );
+	wait.delay_10_us(5);
+	ddd_7->ddd_run_pattern(FB_100kHz_ILIM_pulse_start_X,FB_100kHz_ILIM_pulse_stop_X);	
+	wait.delay_10_us(40);
+
+	Gage_Wait_For_Capture_Complete();
+
+	//////Gage_Start_Capture(  );
+	//////ddd_7->ddd_run_pattern();	// FB loop 100kHz to have device request switching again with ILIM at 100kHz
+	//////wait.delay_10_us(31);		// Good for 30 ILIM pulses to show up on scope due to delay enough for only 30 FB clks
+	//////ddd_7->ddd_stop_pattern();
+	//////Gage_Wait_For_Capture_Complete();
+
+	//DEBUG=1;
+	// Process data
+	WAVE_NAME =  "ILIM_P1_RDSON_PEAK";
+	FIND_RDSON_Peak_FLAG = 1;		// Will be reset at the end of  Gage_Find_Ilim func
+	//HL added to turn off pvi in order to debug the function below due to repeatability issue.
+	pv3_4->set_current(0.0, RANGE_10_A);			// Time=1e3*7e-3*(Vcap-(userV+5V))/userI; max C*U/I = 369mS
+	pv3_4->set_voltage(0.0, RANGE_100_V);
+	wait.delay_10_us(10);
+	pv3_4->drive_off();
+
+	if(g_TurretCB)
+	{
+		Gage_Find_Ilim_Turret(&ILIM_Seak_rslt, &Dummy_didt, &Dummy_didt, &Rdson_peak_rslt, &Dummy_rdson_spec);
+
+	}
+	else
+	{
+		Gage_Find_Ilim(&ILIM_Seak_rslt, &Dummy_didt, &Dummy_didt, &Rdson_peak_rslt, &Dummy_rdson_spec);
+	}
+	//DEBUG=0;
+
+	// Use ILIM_P1_S without Rdson buffer connected for more accurate measurement. 
+	if (ILIM_P1_S !=0)
+		RDSON_P1_S = (Rdson_peak_rslt * ILIM_Seak_rslt) /ILIM_P1_S;     
+	else
+		RDSON_P1_S = 999.0;
+	Open_relay(K10);			// Disconnect Rdson Buffer
+	delay(2);
+}
+
+	//Samsung bit trimmed
+#if 1
+	if(gTrim_SAM_P)
+	{
+		//********************************************************************************************/
+		//******************** ILIM - 70% - Samsung Soft Start****************************************/
+		//********************************************************************************************/
+
+	/********************************************************************************
+	 *							Samsung Soft Start - Tsoft						    *	
+	 ********************************************************************************/
+	// POWER DOWN FROM PREVIOUS TEST///
+	//PV3 Stop supply current 
+
+	pv3_4->set_current(0.0, RANGE_10_A);			// Time=1e3*7e-3*(Vcap-(userV+5V))/userI; max C*U/I = 369mS
+	pv3_4->set_voltage(0.0, RANGE_100_V);
+	wait.delay_10_us(10);
+	pv3_4->drive_off();
+
+	//Power Down
+	REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);		// OVI_1_2	 
+	VBPP_ramp_down(3, gVBPP_Low_Voltage_PU, 0.05);
+	BPS_dvi->set_voltage(BPS_ch, 0.0, 	VOLT_10_RANGE);	// DVI_9_1
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0,		RANGE_10_V);	// OVI_1_1
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(100);
+//pulse.do_pulse();
+		Disconnect_InvSyn_IM();								// FW needs to be feeded by Drain
+		Open_relay(K17);									// FB to DDD7_2
+		Open_relay(K3);
+		Open_relay(K1);										// Connect Iped to CT2+ to CT2-
+		Open_relay(K9);										// Connect CT2- to Drain
+		Open_relay(KIM1);									// Connect Vind to CT2+ to CT2-
+		Open_relay(KIM3);	
+		//Close_relay(KIM3);						            // ILIM Pedestal Use resistor Rpd2 (953mA)
+		Open_relay(K10);									// Connect Rdson Buffer
+		//if(g_TurretCB)
+		//{
+			////mux_20->open_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+			////delay(2);
+		//}
+		wait.delay_10_us(50);
+
+	SAMPLE_SIZE = GAGE_POST_1M;
+	INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+
+	ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+	wait.delay_10_us(10);
+//
+	Close_relay(K3);	//Drain to L1 to 50ohm to K2NC to K1NC to DVI-11-0 (delay is inside power-up)
+	VBPP_Negative_Cycle();
+	delay(5);
+//pulse.do_pulse();
+	//if(REL_FLOW)	delay(g_REL_dly);	//delay needed to get the correct ILIM reading
+//DDD_Load_Patterns();
+//wait.delay_10_us(20);
+//int i,pulses,j,start_vec,stop_vec;
+//i =100;
+//	FB_MINNO_SSS_pulse_start=i;
+//	//20 pulses of 100KHz
+//	pulses = 1;
+//	while(pulses<=20)//REQ=1.7 V for 200us
+//	{
+//		start_vec= i; stop_vec= i + 1*(36+4);	
+//		for (i= start_vec; i< stop_vec; i++)
+//		{
+//			for(j=0;j<18;j++)  {ddd_7->ddd_load_pattern(i,"XXXXXX1X");i++;}
+//			i--;
+//		}
+//		pulses++;
+//	}
+//	pulses = 1;
+//	while(pulses<=100)//Toggle REQ 100 times at 100KHZ
+//	{
+//	start_vec= i; stop_vec= i + 1*(36+4);	
+//	for (i= start_vec; i< stop_vec; i++)
+//	{
+//		//MINNO Pattern
+//		for(j=0;j<18;j++)  {ddd_7->ddd_load_pattern(i,"XXXXXX0X");i++;}
+//		for(j=0;j<4;j++)   {ddd_7->ddd_load_pattern(i,"XXXXXX1X");i++;} 
+//		for(j=0;j<18;j++)  {ddd_7->ddd_load_pattern(i,"XXXXXX0X");i++;}
+//
+//		i--;
+//	}
+//	pulses++;
+//	}
+//FB_MINNO_SSS_pulse_stop = i-1;
+//
+//delay(2);
+
+	SyncHS_PowerUp_Secondary_in_Normal_Mode_SKIP_WAITnLISTEN_SSS(High_Vd_Input);
+
+//	if(LB_Rev >= 5||g_TurretCB)			ddd_7->ddd_set_hi_level(1.7);
+	//else								ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+		//ddd_7->ddd_set_lo_level(0.9);
+	//wait.delay_10_us(100); 
+	//wait.delay_10_us(10);
+		//ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	//wait.delay_10_us(50);
+
+	//Close_relay(K17);	//FB   to   DDD
+	//delay(5);
+
+	//ddd_7->ddd_run_pattern(FB_MINNO_SSS_pulse_start, FB_MINNO_SSS_pulse_stop);
+	//wait.delay_10_us(120);
+	//delay(1);
+
+	if(InductorRev >=4)
+	{
+		D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+		wait.delay_10_us(50);
+	}
+
+
+	if(g_TurretCB)
+	{
+		if (MOSFET_SIZE == 2)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -1,	VOLT_20_RANGE);
+		}
+		else if(MOSFET_SIZE == 5)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -2,	VOLT_20_RANGE);
+		}
+		else if(MOSFET_SIZE == 8)
+		{
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1,	VOLT_20_RANGE);
+		}
+		else
+			InvSyn_REF_ovi->set_voltage(InvSyn_ch, -2,	VOLT_20_RANGE);
+	}
+	else
+	{
+		
+		if(OPCODE==4400)					InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,	VOLT_20_RANGE);
+		if(OPCODE==4300||OPCODE==4500)		
+		{
+			//HL-9-15-17.  Remove the below setting for size 3 at hot due to new Invsync ckt.
+			
+				InvSyn_REF_ovi->set_voltage(InvSyn_ch, 0,	VOLT_20_RANGE);	//Apply for all devices		Xie 1/16/2018
+					
+			
+		}
+	}
+	//delay(1);
+
+									// Will immediately change to this level upon execution
+	//delay(1);
+//pulse.do_pulse();
+	//ddd_7->ddd_run_pattern(Low_FB_pat_start, Low_FB_pat_stop);
+	//wait.delay_10_us(50);
+	//Setup FB to connect to DDD
+//wait.delay_10_us(50);
+	//delay(5);
+//	VBPP_Power_Up_w_Test_Mode(gTM1_p,ILIM_NORM);
+//	D_dvi->set_voltage(D_ch, 1.5, 		VOLT_50_RANGE);	// DVI_11_0	
+//	delay(4);	// Wait and Listen time in TM1. Hiep adjusted from 3ms to 4ms.
+//	// Run 100kHz clocks to avoid the Primary going into Overload Freq.
+////pulse.do_pulse();
+//	ddd_7->ddd_run_pattern(FB_100kHz_100_pulses_start, FB_100kHz_100_pulses_stop);
+//	wait.delay_10_us(100);
+//	if(gSiliconRev_P>=3)
+//	{
+//		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+//		VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final, 50e-3);	// vstart, vstop, vstep	B3 material
+//		wait.delay_10_us(20);
+//	}
+//	//pulse.do_pulse();
+//	Gage_Start_Capture(  );
+	//Issue 100 FB pulses with Normal VBPP requesting primary to switch 100 times and expect 100 ILIM pulses
+//pulse.do_pulse();
+	
+	//Gage_Wait_For_Capture_Complete();
+
+	/*if(gSiliconRev_P>=3)
+	{
+
+		VBPP_ramp_down(gVBPP_P_s_final, 3.5, 50e-3);
+		delay(2);
+
+	}*/
+
+
+	//Connect_InvSyn_IM_New(High_Vd_Input);
+
+	if(g_TurretCB)
+	{
+		//Gage_Start_Capture(  );
+		wait.delay_10_us(10);
+	}
+	else
+	{
+		wait.delay_10_us(10);
+		//delay(5);
+	}
+
+	
+		//Capture started in previous power-up routine
+		Gage_Wait_For_Capture_Complete();
+
+		/*BPS_dvi->set_meas_mode(BPS_ch,			DVI_MEASURE_CURRENT);
+		wait.delay_10_us(5);
+		gIBPS_sw = 0;
+		gIBPS_sw = BPS_dvi->measure_average(25);*/
+	}
+	
+	// Power down
+	Open_relay(K17);
+	Open_relay(KIM3);
+	delay(1);
+	ddd_7->ddd_set_lo_level(0.1);		
+	ddd_7->ddd_set_hi_level(0.0);		
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start, Low_XXX_pat_stop);	
+
+	REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);		// OVI_1_2	 
+	BPS_dvi->set_voltage(BPS_ch, 0.0, 	VOLT_10_RANGE);	// DVI_9_1
+	VPIN_ovi->set_voltage(VPIN_ch, 0.0,		RANGE_10_V);	// OVI_1_1
+	D_dvi->set_voltage(D_ch, 0.0, 		VOLT_50_RANGE);	// DVI_11_0
+	wait.delay_10_us(10);
+	pv3_4->set_current(0);						
+	pv3_4->set_voltage(0, RANGE_100_V);
+	wait.delay_10_us(10);
+	pv3_4->open_switch(PV3_LOW_FORCE_2);
+	pv3_4->open_switch(PV3_LOW_SENSE_2);
+	pv3_4->open_switch(PV3_HIGH_FORCE_1);
+	pv3_4->open_switch(PV3_HIGH_SENSE_1);
+
+	// Power down
+	pv3_4->drive_off();	
+	pv3_4->charge_on();	
+	Open_relay(KIM1);
+	Open_relay(K9);		// CT2		to	Drain
+	Open_relay(KIM3);	//Open = Low Pedestal
+	Open_relay(K1);
+	Open_relay(K17);	// FB		to	DDD7-2
+	Open_relay(K10);	// Drain	to	Rdson Buffer
+	Open_relay(K12);	// Vpin(UV)	to  DDD7_1	
+	Disconnect_InvSyn_IM();									// FW needs to be feeded by Drain
+	delay(2);
+	//if(g_TurretCB)
+	//{
+		//mux_20->open_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+		//delay(2);
+	//}
+
+	// Power down
+	//ddd_7->ddd_stop_pattern();								//Need to do a stop pattern when you don't want ddd looping
+	//delay(1);
+	//ddd_7->ddd_set_hi_level(4.0);							// Will immediately change to this level upon execution
+	//ddd_7->ddd_set_lo_level(0.1);							// Will immediately change to this level upon execution
+	//delay(1);
+	//ddd_7->ddd_run_pattern(Low_XXX_pat_start, Low_XXX_pat_stop);	
+	//wait.delay_10_us(3);
+
+	//// Power down
+	//ovi_1->connect(OVI_CHANNEL_0);
+	//dvi_11->open_relay(BUS_SENSE1);
+	//dvi_11->close_relay(CONN_SENSE1);
+	//dvi_11->close_relay(CONN_FORCE1);
+	//dvi_13->open_relay(BUS_SENSE1);
+	//dvi_13->open_relay(BUS_FORCE1);
+	//mux_14->open_relay(MUX_3_BUS3);
+	//
+	//// Power down
+	//Power_Down_Secondary();
+	//Power_Down_Primary();
+	//wait.delay_10_us(5);
+
+
+	//** Process SoftStart data:  Find all parameters **	
+	//DEBUG = 1;	//dump SoftStart awav waveform and debug file
+	WAVE_NAME =  "ILIM_tSoftRamp";
+	if(g_TurretCB)
+	{
+		Gage_Find_Ilim_SSS_Turret(&ILIM_70pct_mA_P, &tsoft_SSS, &tHandshake_SSS, &Fosc_min_SSS, &Fosc_max_SSS, &gIdmax_Jitter_132kHz, &gIdmin_Jitter_132kHz, &fModulation_P, &Fosc_Sss_P, &tRTM);
+
+	}
+	else
+	{
+		Gage_Find_Ilim_SSS(&ILIM_70pct_mA_P, &tsoft_SSS, &tHandshake_SSS, &Fosc_min_SSS, &Fosc_max_SSS, &gIdmax_Jitter_132kHz, &gIdmin_Jitter_132kHz, &fModulation_P, &Fosc_Sss_P, &tRTM);
+	}
+	DEBUG = 0;
+	ILIM_Reduce_w_Jitter_132kHz = (1 - gIdmax_Jitter_132kHz / gIdmin_Jitter_132kHz) * 100;
+//	ILIM_70pct_P = (ILIM_70pct_mA_P / ILIM_S)*100.0;
+	ILIM_70pct_P = (ILIM_70pct_mA_P / gIdmin_Jitter_132kHz)*100.0;
+	g_tHandshake_SSS = int(tHandshake_SSS*1e6/10);
+	if(g_tHandshake_SSS<5 || g_tHandshake_SSS>99)	g_tHandshake_SSS=6;	//FWPK use this variable.  Could not be < 6
+
+	////debug only
+	//if(Fosc_max_SSS < 129.6e3)
+	if(0)
+	{
+		gDEBUG = 1;
+		DEBUG = 1;	//dump SoftStart awav waveform and debug file
+		WAVE_NAME =  "ILIM_tSoftRamp";
+		Gage_Find_Ilim_SSS(&ILIM_70pct_mA_P, &tsoft_SSS, &tHandshake_SSS, &Fosc_min_SSS, &Fosc_max_SSS, &gIdmax_Jitter_132kHz, &gIdmin_Jitter_132kHz, &fModulation_P, &Fosc_Sss_P, &tRTM);
+		DEBUG = 0;
+		gDEBUG = 0;
+	}
+#endif
+	//pulse.do_pulse();
+	if(g_TurretCB){
+	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	// 18kHz jitter tests //
+	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //	
+	
+	float DDD_hi_Level = 0;
+	int StepCount = 7;
+	//*** StepCount loop: try different DDD hi levels ***
+	while (StepCount>0)
+	{
+		//set new DDD_hi_Level
+		if (StepCount == 7)
+			DDD_hi_Level = 1.265*1.05; // 5% above CV. //
+		if (StepCount == 6)
+			DDD_hi_Level = 1.265*1.1; // 10% above CV. //
+		if (StepCount == 5)
+			DDD_hi_Level = 1.265*1.075; // 7.5% above CV. //
+		if (StepCount == 4)
+			DDD_hi_Level = 1.265*1.025; // 2.5% above CV. //
+		if (StepCount == 3)
+			DDD_hi_Level = 1.265*1.125; // 12.5% above CV. //
+		if (StepCount == 2)
+			DDD_hi_Level = 1.265*1.0; // 0% above CV. //
+		if (StepCount == 1)
+			DDD_hi_Level = 1.265*1.15; // 15% above CV. //
+
+		//DEBUG=1;	//print DDD_hi_level
+		if(DEBUG==1 && gDEBUG)
+			printf("  Gage_Find_Ilim_18kHz: DDD_hi_Level=  %.3f\n",DDD_hi_Level);
+		DEBUG=0;
+
+		if (gTrim_VR_S == 1)	//no need to loop, internal fb resistors
+			StepCount = 1;
+
+		VBPP_Negative_Cycle();
+
+		// Power down from previous tests //
+		pv3_4->set_current(0.1e-9, RANGE_10_A);
+		pv3_4->set_voltage(0.0, RANGE_100_V);
+		wait.delay_10_us(10);
+		pv3_4->drive_off();
+
+		// PV3 charge //
+		// Loop to monitor charging of cap.  Stop when either 63V is reached or 2000 counts
+		pv3_4->set_voltage(0, RANGE_3_V);
+		pv3_4->set_current(0);
+		pv3_4->set_meas_mode(PV3_CHARGE_S);		// Monitor storage cap charge
+		pv3_4->charge_on();						// Requires a 15ms wait
+		float temp_1 = 0;
+		float temp_2 = 0;
+		while((temp_1<63.0) && (temp_2 < 2000)) {
+			wait.delay_10_us(100);
+			temp_2++;
+			temp_1 = pv3_4->measure();
+		}
+		pv3_4->charge_off();					// Get ready to use
+		wait.delay_10_us(1500);					// Requires a 15ms wait
+
+			REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);
+		
+		VBPP_ramp_down(3, gVBPP_Low_Voltage_PU, 0.05);
+		BPS_dvi->set_voltage(BPS_ch, 0.0, VOLT_10_RANGE);
+		VPIN_ovi->set_voltage(VPIN_ch, 0.0, RANGE_10_V);
+		D_dvi->set_voltage(D_ch, 0.0, VOLT_50_RANGE);
+		wait.delay_10_us(50);
+
+		// Initialize Instruments //
+		FW_dvi->set_voltage(FW_ch, 0, VOLT_50_RANGE);
+		FW_dvi->set_current(FW_ch, 300e-3, RANGE_300_MA);
+		FW_dvi->set_meas_mode(FW_ch, DVI_MEASURE_VOLTAGE);
+		
+		VO_dvi->set_voltage(VO_ch, 0, VOLT_50_RANGE);
+		VO_dvi->set_current(VO_ch, 300e-3, RANGE_300_MA);
+		VO_dvi->set_meas_mode(VO_ch, OVI_MEASURE_VOLTAGE);
+
+		REQ_ovi->set_voltage(REQ_ch, 0, RANGE_10_V); // Inno3x only //
+		REQ_ovi->set_current(REQ_ch, 30e-3, RANGE_30_MA); // Inno3x only //
+		REQ_ovi->set_meas_mode(REQ_ch, OVI_MEASURE_VOLTAGE); // Inno3x only //
+
+		SR_dvi2k->set_voltage(SR_ch, 0, VOLT_50_RANGE);
+		SR_dvi2k->set_current(SR_ch, 200e-3, RANGE_200_MA);
+		SR_dvi2k->set_meas_mode(SR_ch, DVI_MEASURE_VOLTAGE);
+
+	
+		BPS_dvi->set_voltage(BPS_ch, 0, VOLT_50_RANGE);
+		BPS_dvi->set_current(BPS_ch, 300e-3, RANGE_300_MA);
+		BPS_dvi->set_meas_mode(BPS_ch, DVI_MEASURE_VOLTAGE);
+
+		
+		FWC_dvi2k->set_voltage(FWC_ch, 0, VOLT_50_RANGE);
+		FWC_dvi2k->set_current(FWC_ch, 200e-3, RANGE_200_MA);
+		FWC_dvi2k->set_meas_mode(FWC_ch, DVI_MEASURE_VOLTAGE);
+
+		D_dvi->set_voltage(D_ch, 0, VOLT_50_RANGE);
+		D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);
+		D_dvi->set_meas_mode(D_ch, DVI_MEASURE_VOLTAGE);
+
+		//BPP_DVI->set_voltage(BPP_ch, 0, VOLT_50_RANGE); // Share dvi with Drain //
+		//BPP_DVI->set_current(BPP_ch, 300.0e-3, RANGE_300_MA); // Share dvi with Drain //     
+		//BPP_DVI->set_meas_mode(BPP_ch, DVI_MEASURE_VOLTAGE); // Share dvi with Drain //
+
+		BPP_ovi->set_voltage(BPP_ch, 0, RANGE_10_V);
+		BPP_ovi->set_current(BPP_ch, 30e-3, RANGE_30_MA);
+		BPP_ovi->set_meas_mode(BPP_ch, OVI_MEASURE_VOLTAGE);
+
+		VPIN_ovi->set_voltage(VPIN_ch, 0, RANGE_10_V);  
+		VPIN_ovi->set_current(VPIN_ch, 30e-3, RANGE_30_MA);	
+		VPIN_ovi->set_meas_mode(VPIN_ch, OVI_MEASURE_VOLTAGE);
+
+		// DDD low //
+		delay(1);
+		ddd_7->ddd_set_hi_level(4);
+		ddd_7->ddd_set_lo_level(0);
+		delay(1);
+		ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		wait.delay_10_us(10);
+
+		Open_All_Relays();	
+
+		// Disconnect Inv Sync circuit //
+		Disconnect_InvSyn_IM();
+		wait.delay_10_us(200);
+
+		//** End of Powerdown **
+		
+		// Setup digitizer //
+		//SAMPLE_SIZE = GAGE_POST_256K;
+		SAMPLE_SIZE = GAGE_POST_1M;
+		INNO_Gage_ChanAB_setup(0.15);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
+
+		// Powerup Primary in Normal Mode, Test Mode 5, to bypass wait and listen //
+
+			// V //
+			VPIN_ovi->set_current(VPIN_ch, 0.1e-9, RANGE_30_UA); // Float //	
+			delay(1);
+			Close_relay(K12); // Connect DDD7_1 to V pin //
+
+			// BPP //
+			// Do nothing.  Already held to 0V. //
+		
+			// D //
+			// Already held to 0V. //
+			Close_relay(K2); // Connect dvi directly to drain //
+
+			// Connect Inv Sync circuit //
+			Connect_InvSyn_IM(Low_Vd_Input);
+
+			if (OPCODE==4300 || OPCODE==4500)
+			{
+				if(MOSFET_SIZE==6&& LB_Rev >= 5)
+				{
+				
+					InvSyn_REF_ovi->set_voltage(InvSyn_ch, 2.5,		VOLT_20_RANGE);	// OVI_1_4	
+				
+				}
+			}
+
+			if (OPCODE==4200 || OPCODE==4250)
+			{
+				if(MOSFET_SIZE==5&& (LB_Rev >= 5))
+				{
+				
+					InvSyn_REF_ovi->set_voltage(InvSyn_ch, 2.0,		VOLT_20_RANGE);	// OVI_1_4	
+				
+				}
+
+				if(MOSFET_SIZE==5&& (g_TurretCB))
+				{
+				
+					InvSyn_REF_ovi->set_voltage(InvSyn_ch, 3.0,		VOLT_20_RANGE);	// OVI_1_4	
+				
+				}
+			}
+
+
+
+			wait.delay_10_us(200); // Wait for relays //
+
+			// Powerup BPP //
+			VBPP_ramp_up(0, 5.0, 0.2);	// vstart, vstop, vstep	
+
+			// Vpin clock 5 pulses (10us positive) to enter test mode 5. //
+			Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+			wait.delay_10_us(10);
+
+			// Connect inductor module to drain. //
+			Close_relay(K1); // Connect ILIM pedestal //
+			Close_relay(KIM1); // Use inductor L1 on ILIM module. //
+			Open_relay(K2); // Disonnect dvi from drain //
+			Close_relay(K9); // Connect inductor module to drain. //
+			wait.delay_10_us(300);
+
+			// Set pedestal voltage. //
+			D_dvi->set_voltage(D_ch, 45.0, VOLT_50_RANGE);
+			wait.delay_10_us(50);
+
+			// Connect PVI //
+			PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+			if(g_TurretCB)
+			{
+				wait.delay_10_us(1000); //HL added to prevent invalid failure on Turret CB
+			}
+
+			//BPP ramp from 5V to gVBPP_PV_Init with 50mV step. //
+			VBPP_ramp_up(5.0, gVBPP_PV_Init+.05, 50e-3);		
+
+			VBPP_ramp_down(gVBPP_PV_Init+.05, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+		
+			// Determine what ILIM mode we want to power-up in (IMPORTANT: ZF-P MUST BE TRIMMED TO RECOGNIZE) //
+			int ILIM_Select;
+			ILIM_Select = ILIM_NORM;
+			if (ILIM_Select == ILIM_NORM) wait.delay_10_us(3);	// 1.0 uF (ILIM) 30us //
+			else if(ILIM_Select == ILIM_INCR) wait.delay_10_us(150); // 10 uF (ILIM+1) 1.2ms //
+
+			// BPP set below VBP- //
+			BPP_ovi->set_voltage(BPP_ch, gVBPP_M_Init-200e-3, RANGE_10_V);
+			wait.delay_10_us(50);
+
+
+			// Reconnect ovi to Vpin.  Disconnect DDD. //
+			VPIN_ovi->set_voltage(VPIN_ch, 0, RANGE_10_V);  
+			VPIN_ovi->set_current(VPIN_ch, 30e-3, RANGE_30_MA);	
+			wait.delay_10_us(20);
+			Open_relay(K12); // Disconnect DDD7_1 from V pin //
+			wait.delay_10_us(200);
+
+			// Setup DDD to drive FB 
+			//INNO3X DDD FB levels
+			/*ddd_7->ddd_set_hi_level(DDD_hi_Level);
+			ddd_7->ddd_set_lo_level(gCV_Low);*/
+//pulse.do_pulse();
+			//MINNO DDD REQ levels
+			ddd_7->ddd_set_hi_level(1.7);
+			ddd_7->ddd_set_lo_level(0.9);
+			delay(1);
+			ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);
+			wait.delay_10_us(20);
+			
+			// FW //
+			// Do nothing.  Dvi already disconnected via relay. //
+
+
+			//** Connect DDD to FB pin to switch at 18kHz. //
+				// Vout //
+				VO_dvi->set_voltage(VO_ch, 5, VOLT_10_RANGE);
+
+			// Connect DDD to FB pin to switch at 18kHz. //
+			Close_relay(K17); // DDD to FB pin. //
+			wait.delay_10_us(200);
+
+
+			// SR //
+		//Commented out the code for MINNO
+			/*
+			//SR_dvi2k->set_current(SR_ch, 0.0e-6,	RANGE_2_UA);	
+			//SR_dvi2k->set_voltage(SR_ch, 0.0, 		VOLT_2_RANGE);	// DVI_21_1
+			//delay(2);
+			//mux_20->close_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+			//delay(2);
+			//dvi_13->close_relay(BUS_SENSE1);
+			//dvi_13->close_relay(BUS_FORCE1);
+			//mux_14->close_relay(MUX_3_BUS3);
+			//delay(2);
+			*/
+	
+			// BPS //
+			// Do nothing.  Already held to 0V. //
+
+			// IS //
+			// Do nothing.  Already held to 0V. //
+
+			// VBPP back above VBP+ to complete the powerup. //
+			//BPP_ovi->set_voltage(BPP_ch, gVBPP_P_Init+50e-3, RANGE_10_V); 
+			//wait.delay_10_us(30);
+			if(gSiliconRev_P>=3)
+			{
+				BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+				VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+				wait.delay_10_us(10);
+			}
+			else
+			{
+				ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_Init+50e-3, RANGE_10_V);
+				wait.delay_10_us(30);
+			}
+			// Wait and listen is skipped, drain should now be switching. //
+
+		//** End of Primary powerup //
+			//pulse.do_pulse();
+		//** Powerup Secondary in normal mode //
+		// Bring up BPS >VBPS+ to initiate handshake. //
+		BPS_dvi->set_voltage(BPS_ch, gVBPS_P_Init+0.1, 	VOLT_10_RANGE);
+		wait.delay_10_us(50); // Needed //
+		if(g_TurretCB)
+		{
+			wait.delay_10_us(50); // Needed //
+		}
+		// Handshake should now be complete, device now operating under secondary control.  Since FB is > CV, secondary requests are still inhibited. //
+
+		if(gSiliconRev_P>=3)	//Lower BPP plus threshold correctly for Primary B3 silicon and later materials
+		{
+			BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+			BPP_ovi->set_voltage(BPP_ch, gVBPP_P_s_final, RANGE_10_V);
+			wait.delay_10_us(10);
+		}
+		//pulse.do_pulse();
+		// Setup DDD //
+		if (gInnoCHY)
+		{
+			delay(1);
+			// Setup DDD Hi/Lo //
+			ddd_7->ddd_set_hi_level(5.25);
+			ddd_7->ddd_set_lo_level(4.5);
+			delay(1);
+		}
+		if (gInnoCHY)
+		{
+			// Connect DDD to Vout pin to switch at 18kHz. //
+			Close_relay(K27); // DDD to Vout pin. //
+			wait.delay_10_us(200);
+			VO_dvi->set_current(VO_ch, 0.1e-9, RANGE_30_UA);
+			VO_dvi->set_voltage(VO_ch, 0, VOLT_5_RANGE);
+			wait.delay_10_us(1);
+		}
+		// end of secondary powerup
+
+		//drive FB
+		ddd_7->ddd_run_pattern(FB_125kHz_pulse_start,FB_125kHz_pulse_stop);	//FB
+		wait.delay_10_us(250);
+
+		// 18kHz jitter tests //
+		//DEBUG=1;	//scope pulse
+		if(DEBUG==1 && gDEBUG)	
+			
+		//DEBUG=0;	
+
+	// 18kHz jitter tests //
+		//Start Capture
+		Gage_Start_Capture(  );
+
+		//Run 18kHz pattern (80 pulses of 18kHz) drive FB
+		ddd_7->ddd_run_pattern(FB_18kHz_pulse_start,FB_18kHz_pulse_stop);	
+if(g_TurretCB)
+{
+	wait.delay_10_us(50);
+}
+		//Finish capture
+		Gage_Wait_For_Capture_Complete();
+
+		//DEBUG=1;	//dump awav file of capture data
+		// Process data
+		WAVE_NAME =  "ILIM_18kHz";
+		Gage_Find_Ilim_18kHz(&ILIM_Jit18K_S, &ILIMhi_Jit18K_S, &ILIMLo_Jit18K_S, &Fosc_Mod_18K_S);
+		//DEBUG=0;
+
+		// Power down //
+		pv3_4->set_current(0.1e-9, RANGE_10_A);
+		pv3_4->set_voltage(0.0, RANGE_100_V);
+		wait.delay_10_us(10);
+		pv3_4->drive_off();
+		//delay(1);
+		pv3_4->open_switch(PV3_LOW_FORCE_2);
+		pv3_4->open_switch(PV3_LOW_SENSE_2);
+		pv3_4->open_switch(PV3_HIGH_FORCE_1);
+		pv3_4->open_switch(PV3_HIGH_SENSE_1);
+		//delay(1);
+		//pv3_4->charge_on();	
+		
+		D_dvi->set_voltage(D_ch, 0, VOLT_50_RANGE);
+		D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);
+
+		BPS_dvi->set_voltage(BPS_ch, 0, VOLT_50_RANGE);
+		BPS_dvi->set_current(BPS_ch, 300e-3, RANGE_300_MA);
+
+		BPP_ovi->set_voltage(BPP_ch, 0, RANGE_10_V);
+		BPP_ovi->set_current(BPP_ch, 30e-3, RANGE_30_MA);
+
+		VPIN_ovi->set_voltage(VPIN_ch, 0, RANGE_10_V);  
+		VPIN_ovi->set_current(VPIN_ch, 30e-3, RANGE_30_MA);	
+
+		REQ_ovi->set_voltage(REQ_ch, 0, RANGE_10_V); // Inno3x only //
+		REQ_ovi->set_current(REQ_ch, 30e-3, RANGE_30_MA); // Inno3x only //
+
+		VO_dvi->set_voltage(VO_ch, 0, VOLT_50_RANGE);
+		VO_dvi->set_current(VO_ch, 300e-3, RANGE_300_MA);
+
+		SR_dvi2k->set_voltage(SR_ch, 0, VOLT_50_RANGE);
+		SR_dvi2k->set_current(SR_ch, 200e-3, RANGE_200_MA);
+		delay(1);
+		ddd_7->ddd_set_lo_level(0);
+		wait.delay_10_us(100);                           // HL do not remove delay.  Else, it will corrupt the DDD pattern.
+		ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		wait.delay_10_us(10);
+
+		Disconnect_InvSyn_IM();
+
+		Open_relay(K17); // DDD to FB pin. //
+		Open_relay(K27); // DDD to Vout pin. //
+		Open_relay(K1); // ILIM pedestal //
+		Open_relay(KIM1); // Inductor L1 on ILIM module. //
+		Open_relay(K2); // dvi from drain //
+		Open_relay(K9); // inductor module to drain. //
+		Open_relay(K12);
+		dvi_13->open_relay(BUS_SENSE1); // Short SR to GND. // 
+		dvi_13->open_relay(BUS_FORCE1); // Short SR to GND. // 
+		mux_14->open_relay(MUX_3_BUS3); // Short SR to GND. // 
+		wait.delay_10_us(300);
+		//if(g_TurretCB)
+		//{
+			mux_20->open_relay(MUX_1_1);      //Direct short SR to GND on Turret Brd.
+			delay(2);
+		//}
+
+
+		if ( (ILIM_Jit18K_S > 72 && ILIM_Jit18K_S < 93) && (Fosc_Mod_18K_S > 200 && Fosc_Mod_18K_S < 900) )
+			StepCount = -99; // Done with test.  Get out of while loop. //
+		else
+			StepCount--;  // Decrement StepCount, try another DDD high level. //
+	}	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	// END:18kHz jitter tests //
+	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+}//ends if Turret CB
+
+else//if Rasco CB
+{
+	//pulse.do_pulse();
+	//************************************************************************************************************************
+		//************************* ILIM Jitter 18kHz  ***************************************************************************
+		//************************************************************************************************************************
+		//////Setup for FB clocking at 100kHz between 1V to 1.5V (CVth=1.265V, below CVth = request sw, above CVth = request nsw)
+		////if(LB_Rev >= 5||g_TurretCB)		ddd_7->ddd_set_hi_level(gCVth_15pct_Higher); //8% instead of 5%
+		////else							ddd_7->ddd_set_hi_level(gCVth_15pct_Higher);
+		////ddd_7->ddd_set_lo_level(gCV_Low);							
+		////delay(1);
+
+		////ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+		////wait.delay_10_us(3);
+	//Setup FB to connect to DDD
+	//REQ_ovi->set_voltage(REQ_ch, 0.0,	RANGE_2_V);	// OVI_1_2	
+	//wait.delay_10_us(5);
+
+		PV3_Charge_On(RANGE_100_V);	//Prepare PV3 before power-up
+		PV3_Check_Charge(RANGE_100_V);
+		pv3_4->charge_off();
+		//delay(15);	//must have in order to use PV3 properly  (The power-up alone takes about 20ms.  Don't need this delay here)
+
+		SAMPLE_SIZE = GAGE_POST_1M;
+		INNO_Gage_ChanAB_setup(0.05);	// Only do it when SAMPLE_SIZE is diff from previous. 
+										// Each input control and trig control function takes 4ms. 		
+		Close_relay(K3);	//Drain to L1 to 50ohm to K2NC to K1NC to DVI-11-0 (delay is inside power-up)
+		delay(5);
+		//////// Setup Vpin for digital clocking with DDD //
+		//////ovi_1->disconnect(OVI_CHANNEL_1);	
+		//////ddd_7->ddd_set_lo_level(0.1);
+		//////ddd_7->ddd_set_hi_level(4.0);
+		//////delay(1);
+		//////ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		//////wait.delay_10_us(10);
+		//////Close_relay(K12); // Connect DDD7_1 to Vpin(UV) //
+		//////delay(4);
+		////Power_Up_Primary_BypassWL_TM5(ILIM_NORM);
+
+		VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+		VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+		wait.delay_10_us(10);
+
+		//Drain (0V/3mA)
+		D_dvi->set_current(D_ch, 300e-3,	RANGE_300_MA);		
+		D_dvi->set_voltage(D_ch, 0, 		VOLT_50_RANGE);	// DVI_11_0	
+		wait.delay_10_us(10);
+
+		//BPP set 0V
+		BPP_ovi->set_current(BPP_ch, 30e-3,	RANGE_30_MA);
+		wait.delay_10_us(5);
+
+		//BPP ramp up to 5.0V with 200mV step, then from 5V to VBPP_plus + 200mV
+		VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+
+		// Setup Vpin for digital clocking with DDD //
+		ovi_1->disconnect(OVI_CHANNEL_1);
+		delay(2);
+		ddd_7->ddd_set_lo_level(0.1);
+		ddd_7->ddd_set_hi_level(4.0);
+		delay(1);
+		ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+		wait.delay_10_us(10);
+		Close_relay(K12); // Connect DDD7_1 to Vpin(UV) //
+		delay(4);
+		//Vpin clock 5 pulses (10us positive) to enter write mode
+		Force_Vpin_Pulses_5_Times(5.0, 0.0);	
+		wait.delay_10_us(5);
+		wait.delay_10_us(10);
+
+		//Bring Vpin OVI back
+		ovi_1->connect(OVI_CHANNEL_1);	
+		wait.delay_10_us(20);
+		VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+		VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+		wait.delay_10_us(50);
+		Open_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+		delay(1);
+
+		//Bpp ramp from 5V -> 5.5V -> 5V with 50mV step
+		VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);
+		//Drain stays at 0V so BPP signal will be cleaner
+		dvi_11->set_voltage(DVI_CHANNEL_0, 0.0, VOLT_50_RANGE);
+		wait.delay_10_us(10);
+
+		VBPP_ramp_down(gVBPP_PV_Init, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep	
+		wait.delay_10_us(3);	//1.0 uF	(ILIM)		30us
+
+		//BPP set 4.5V for 100us and 5.2V to bring chip back to normal operation
+		//ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_M_Init-200e-3, RANGE_10_V);
+		VBPP_ramp_down(gVBPP_M_Init +0.25, gVBPP_M_Init -0.2, 0.1);	// vstart, vstop, vstep	
+		wait.delay_10_us(50);
+
+		if(gSiliconRev_P >= 3)
+		{
+			BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+			VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 10e-3);	// vstart, vstop, vstep	B3 material
+			wait.delay_10_us(10);
+		}
+		else
+		{
+			ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_Init+50e-3, RANGE_10_V);
+			wait.delay_10_us(30);
+		}
+
+		//Drain set to 5V for switching
+		dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+		wait.delay_10_us(10);
+
+	////Bring Vpin OVI back
+	//	ovi_1->connect(OVI_CHANNEL_1);	
+	//	wait.delay_10_us(20);
+	//	VPIN_ovi->set_voltage(VPIN_ch, 0.0,			RANGE_10_V);  
+	//	VPIN_ovi->set_current(VPIN_ch, 1e-3,		RANGE_30_MA);  
+	//	wait.delay_10_us(50);
+	//	Open_relay(K12);					// Connect DDD7_1	to Vpin(UV)	pin
+	//	delay(1);
+
+	//PROG mode to program out XFWPK bit to disable FWPK switching
+	// Also Program out the External FB option
+		Powerup_Secondary_in_Testmode(gProgRead_AFreg_S, 0, 0);
+		wait.delay_10_us(20);
+		BPS_dvi->set_voltage(BPS_ch, gVBPS_final,	VOLT_10_RANGE);			
+		wait.delay_10_us(20);
+			//if(g_TurretCB)
+			//{
+			//	// Bring up BPS >VBPS+ to initiate handshake. //
+			//	BPS_dvi->set_voltage(BPS_ch, gVBPS_P_Init+0.15, 	VOLT_10_RANGE);
+			//	wait.delay_10_us(100); // Needed //
+			//}
+
+		//Read/write AF register
+		Close_relay(K26);	//SR to DDD-7-5
+		delay(2);
+		//DEBUG=1;
+		Read_Secondary_AF_Reg (SR_AF_temp);	//must be followed by write
+		//MINNO Trim bits
+		//Write corrected bits into AF register
+		SR_AF_temp[5]=0;	// Programming out PK1&Xspeedload
+		SR_AF_temp[6]=0;	// Programming out PK2
+		SR_AF_temp[7]=0;	// Programming out PK3
+		SR_AF_temp[22]=0;	// Programming out PKdig<1>
+		SR_AF_temp[23]=0;	// Programming out PKdig<2>
+		SR_AF_temp[24]=0;	// Programming out PKdig<3>
+		SR_AF_temp[25]=0;	// Programming out PKdig<4>
+		SR_AF_temp[42]=1;	// Programming in  DOPL
+		SR_AF_temp[44]=1;	// Programming in  FWPK
+			Write_Secondary_AF_Reg (SR_AF_temp);
+
+		Open_relay(K18);
+		Open_relay(K21);
+		delay(1);
+		
+		dvi_11->set_voltage(DVI_CHANNEL_0, 0.0, VOLT_50_RANGE);
+		wait.delay_10_us(10);
+
+		REQ_ovi->set_voltage(REQ_ch, gCV_Low, 		RANGE_5_V);	
+		wait.delay_10_us(10);
+	//	//Setup FB High/Low switching thresholds
+	//ddd_7->ddd_set_hi_level(1.7);				// Will immediately change to this level upon execution
+	//ddd_7->ddd_set_lo_level(gREQ_V_Idle);				// Will immediately change to this level upon execution
+	//delay(1);
+	//	
+	//ddd_7->ddd_run_pattern(FB_18kHz_pulse_start,FB_18kHz_pulse_stop);	
+	//wait.delay_10_us(5);
+	////Setup FB High/Low switching thresholds
+	//ddd_7->ddd_run_pattern(High_pat_REQ_start, High_pat_REQ_stop);
+	//wait.delay_10_us(5);
+	///*ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	//	wait.delay_10_us(5);*/
+	//	Close_relay(K17);	
+	//	delay(5);
+	//	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	//	wait.delay_10_us(20);
+		/*ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+		wait.delay_10_us(20);*/
+
+		//RS Note:  Vinminus varies from 2.6V to -3.6V. So, setting Vinplus = -0.75V should be good for size 2.
+    //ET Note:  Vinminus varies from 3.2V to -2.88V. So, setting vinplus = -0.75V should be good for size 2
+	if(LB_Rev>=8 || g_TurretCB)
+	{
+		ovi_1->set_current(OVI_CHANNEL_6, 30e-3, RANGE_30_MA);
+		ovi_1->set_voltage(OVI_CHANNEL_6, -3.0, VOLT_5_RANGE);	//revB inv_syn_circuit  (for tsoft ramp, sometimes secondary just skip sending the request)
+		wait.delay_10_us(20);
+		InvSyn_REF_ovi->set_current(InvSyn_ch, 30e-3,		RANGE_30_MA);	//Temporary	
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, 1.0,		VOLT_20_RANGE);	// OVI_1_4	"Size x8 Vref max = 5V/2 (2.5V), so 3/2 = 1.5V (good margin)"
+		wait.delay_10_us(100);
+		Close_relay(K8);	//Connect InvSyn_IM_IN  to Drain
+		Close_relay(K19);	//Connect InvSyn_IM_OUT to FW pin
+		delay(3);
+	}
+	else
+
+	{
+		Connect_InvSyn_IM_New(Low_Load_Vd_Input);
+	
+	}
+		
+
+		if(gSiliconRev_P>=3)
+		{
+			//BPP_ovi->set_current(BPP_ch, 2e-3,	RANGE_30_MA);		//						B3 material
+			VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final+0.1, 10e-3);	// vstart, vstop, vstep	B3 material
+			wait.delay_10_us(10);
+		}
+		//Drain set to 5V for switching
+		dvi_11->set_voltage(DVI_CHANNEL_0, 5.0, VOLT_50_RANGE);
+		wait.delay_10_us(20);
+
+		//FB (2V)  pull FB above CVth to force No Switching
+		//if(LB_Rev >= 5||g_TurretCB)	ddd_7->ddd_set_hi_level(1.7);
+		//else						ddd_7->ddd_set_hi_level(gCVth_10pct_Higher);
+		//ddd_7->ddd_set_lo_level(0.9);								// Will immediately change to this level upon execution
+		//delay(1);
+		//FB (2V)  pull FB above CVth to force No Switching
+	if(LB_Rev >= 5||g_TurretCB)	ddd_7->ddd_set_hi_level(1.7);
+	else						ddd_7->ddd_set_hi_level(gCVth_10pct_Higher);
+	ddd_7->ddd_set_lo_level(0.9);								// Will immediately change to this level upon execution
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(5);
+	Close_relay(K17);	
+	delay(5);
+	ddd_7->ddd_run_pattern(Low_FB_pat_start,Low_FB_pat_stop);
+	wait.delay_10_us(20);
+	ddd_7->ddd_run_pattern(High_pat_FB_start,High_pat_FB_stop);
+	wait.delay_10_us(20);
+		
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, 10.0,        VOLT_20_RANGE);    // Avoid noise coupling over to InvSynCircuit to FW
+		wait.delay_10_us(50); 
+
+		D_dvi->set_voltage(D_ch, 0.0, 			VOLT_50_RANGE);	// DVI_11_0
+		wait.delay_10_us(50);
+
+		// Connect Inductor to Drain
+		Open_relay(K3);											// Drain to RL pullup
+		Close_relay(KIM1);										// Connect Vind to CT2+ to CT2-
+		Close_relay(K9);										// Connect CT2- to Drain
+
+		////// Do not need the pedestal for Size 2,3 devices...
+		////if (MOSFET_SIZE !=2 && MOSFET_SIZE !=3)
+		////	Close_relay(K1);			// Connect Iped to CT2+ to CT2-
+		//	Open_relay(K1);				// Connect Iped to CT2+ to CT2-
+		//Close_relay(KIM3);										// ILIM Pedestal Use resistor Rpd2 (953mA)
+		//Open_relay(KIM3);										// ILIM Pedestal Use resistor Rpd1 (100mA)
+		if(MOSFET_SIZE==8 && gILIM_TARGET_S > 2.2)//Use Rped2 for Minno size x8 2400 ILIM
+			Close_relay(KIM3);
+		else
+			Open_relay(KIM3);
+			
+		delay(4);
+		
+		//RS Note: Vinminus varies from 2.6V to -3.6V. So, setting Vinplus = 1.5V should be good for size 2
+       //ET Note: Vinminus varies from 0.7V to -4.4V. so, setting Vinplus = -1.5V should be good for size 2
+    if(g_TurretCB)
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, -1.0,        VOLT_20_RANGE);    
+	}
+	else
+	{
+		InvSyn_REF_ovi->set_voltage(InvSyn_ch, InvSync_vREF,        VOLT_20_RANGE);    // cx 11/10/16
+	}
+    wait.delay_10_us(50); 
+		
+
+		// Setup Pedestal
+		D_dvi->set_current(D_ch, 300e-3,		RANGE_300_MA);
+		D_dvi->set_voltage(D_ch, 45.0, 			VOLT_50_RANGE);	// DVI_11_0
+		D_dvi->set_meas_mode(D_ch,				DVI_MEASURE_VOLTAGE);
+		wait.delay_10_us(50);
+
+		if(gSiliconRev_P>=3)
+	{
+		if(g_TurretCB)
+		{	
+			//09-20-17. HL added extra 100mV to keep tap current off and AC GND to be stable.
+			//          HL moved BPP here for Turret to fix repeatability issue.
+			VBPP_ramp_down(gVBPP_P_final, gVBPP_P_s_final+0.1, 10e-3);	// vstart, vstop, vstep	B3 material
+			wait.delay_10_us(10);
+		}
+	}
+
+		if(g_TurretCB)
+		{
+			PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+			//wait.delay_10_us(1000); //HL added to prevent invalid failure on Turret CB
+		}
+		else
+		{
+			PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
+		}
+
+
+		ddd_7->ddd_run_pattern(FB_125kHz_pulse_start,FB_125kHz_pulse_stop);	//FB
+		wait.delay_10_us(300);
+
+		Gage_Start_Capture(  );
+
+		ddd_7->ddd_run_pattern(FB_18kHz_pulse_start,FB_18kHz_pulse_stop);	
+		if(g_TurretCB)
+		{
+			wait.delay_10_us(1000);
+		}
+
+		Gage_Wait_For_Capture_Complete();
+
+		WAVE_NAME =  "ILIM_18kHz";
+		pv3_4->drive_off();	
+	
+		//DEBUG=1;
+		Gage_Find_Ilim_18kHz(&ILIM_Jit18K_S, &ILIMhi_Jit18K_S, &ILIMLo_Jit18K_S, &Fosc_Mod_18K_S);
+		//DEBUG=0;
+
+		pv3_4->set_current(0);						
+		pv3_4->set_voltage(0, RANGE_100_V);
+		wait.delay_10_us(10);
+		pv3_4->open_switch(PV3_LOW_FORCE_2);
+		pv3_4->open_switch(PV3_LOW_SENSE_2);
+		pv3_4->open_switch(PV3_HIGH_FORCE_1);
+		pv3_4->open_switch(PV3_HIGH_SENSE_1);
+		delay(1);
+		pv3_4->charge_on();	
+
+		// Power Down from previous //
+		Power_Down_Everything_Except_Buf_Clamp();
+		Open_All_Relays();	
+		Disconnect_InvSyn_IM();
+
+	}
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	// tChUp_RTM-P //
+	// Measures how accurate the 1us RTM charge up time is.  Goto observe mode address 3 (DchUp).  
+	// 1usec pulse should show up on Vpin when gate turns off. 
+	// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ //
+	//pulse.do_pulse();
+	// Setup Digitizer //
+//	float	ChB_vrng=0.0;
+//	int		vrng_b	=0.0;
+	SAMPLE_SIZE = GAGE_POST_32K;
+	vrng_b = GAGE_PM_5_V;
+	ChB_vrng = 5.0;
+
+	// Channel B setup //
+	Gage_Setup_Acquisition_xp(SAMPLE_RATE_Hz,SAMPLE_SIZE); 
+	//delay(2);
+
+	gage_input_control_xp (GAGE_CHAN_B,		// channel
+			GAGE_INPUT_ENABLE,					// enable / disable
+			GAGE_DC,							// coupling
+			vrng_b|GAGE_1_MOHM_INPUT);			// range, impedance
+	//delay(2);
+	
+	gage_trigger_control_xp (GAGE_CHAN_B,		// trigger source
+			GAGE_DC,							// coupling for ext trig
+			vrng_b,								// range for CHA trigger
+			GAGE_POSITIVE,						// slope
+			3.25,								// 1.0V trigger level 
+	   		SAMPLE_SIZE);						// 20ns * GAGE_WAVEFORM_BUFFER_SIZE
+	//delay(2);
+
+	// Drain //
+	D_dvi->set_voltage(D_ch, 0.0, VOLT_10_RANGE);
+	D_dvi->set_current(D_ch, 300e-3, RANGE_300_MA);
+	Close_relay(K3); // Drain to dvi through pullup resistor. //
+
+	// Setup Vpin for digital clocking //
+	ovi_1->disconnect(OVI_CHANNEL_1);
+	delay(1);
+	// Initialize DDD
+	ddd_7->ddd_set_lo_level(0.1);
+	ddd_7->ddd_set_hi_level(5.0);
+	delay(1);
+	ddd_7->ddd_run_pattern(Low_XXX_pat_start,Low_XXX_pat_stop);
+	wait.delay_10_us(10);
+	
+	// Connect Vpin to DDD. //
+	Close_relay(K12);
+	wait.delay_10_us(300); // Wait for all relays //
+
+	// Remove latchoff problem. //
+	VBPP_Negative_Cycle();
+	BPP_ovi->set_current(BPP_ch, 30e-3, RANGE_30_MA);
+	wait.delay_10_us(10);
+
+	// Primary Power up with test mode 1 and Observe mode in same power up //
+	VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.1);	// vstart, vstop, vstep	
+	wait.delay_10_us(20);
+
+	// Vpin pulse 2 times for Program mode. Then wiggle BPP pin to get into Observe mode. //
+	ddd_7->ddd_run_pattern(Vpin_2clocks_start, Vpin_2clocks_stop);	
+	wait.delay_10_us(5);
+
+	// Set BPP //
+	VBPP_ramp_up(5.0, gVBPP_PV_final, 50e-3);
+	wait.delay_10_us(5);
+	VBPP_ramp_down(gVBPP_PV_final, 5.0, 50e-3);	// vstart, vstop, vstep
+	wait.delay_10_us(20);
+	VBPP_ramp_down(5.0, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep
+
+	// Determine what ILIM mode we want to power-up in (IMPORTANT: ZF-P MUST BE TRIMMED TO RECOGNIZE) //
+	int ILIM_Select;
+	ILIM_Select = ILIM_NORM;
+	if (ILIM_Select == ILIM_NORM) wait.delay_10_us(3);	// 1.0 uF (ILIM) 30us //
+	else if(ILIM_Select == ILIM_INCR) wait.delay_10_us(150); // 10 uF (ILIM+1) 1.2ms //
+
+	// Set BPP below VBP- //
+	BPP_ovi->set_voltage(BPP_ch, gVBPP_M_Init-200e-3, RANGE_10_V);
+	delay(1);
+
+	// Lower Vpin voltage because max RDSon buffer input is clamped to 4.4V. //
+	ddd_7->ddd_set_hi_level(4.0);
+	wait.delay_10_us(100);                 //HL Do not remove. Else, DDD will be corrupted.
+	// Connect Vpin to 5kohm pullup resistor. //
+	Open_relay(K12);
+	Close_relay(K16);
+	Close_relay(KC6);
+	Open_relay(KC5);
+
+	// Connect Vpin to RDSon buffer circuit. //
+	//mux_20->close_relay(MUX_3_1);     //HL new HW doesn't use Mux_20
+	//mux_20->close_relay(MUX_3_2);     //HL new HW doesn't use Mux_20
+	tmu_6->close_relay(TMU_EXT_DRV2);
+	delay(2);
+
+	// Vpin //
+	ddd_7->ddd_run_pattern(High_pat_start, High_pat_stop);	
+	wait.delay_10_us(20);
+
+	// Set BPP above VBP+ // 
+	//BPP_ovi->set_voltage(BPP_ch, gVBPP_P_final, RANGE_10_V);
+	//wait.delay_10_us(30);
+	if(gSiliconRev_P>=3)
+	{
+		//HL RS repeatability observed on TMT92.  Adding extra 20mA seems to be okay.
+		BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);		//						B3 material. HL changed from 2mA to 3mA
+		VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final+20e-3, 10e-3);	// vstart, vstop, vstep	B3 material
+		wait.delay_10_us(10);
+	}
+	else
+	{
+		ovi_1->set_voltage(OVI_CHANNEL_0, gVBPP_P_final, RANGE_10_V);
+		wait.delay_10_us(30);
+	}
+	// Part should now be in Observe mode. //	
+
+	// Clock Vpin three times to look at DChUp observe signal. //
+	ddd_7->ddd_run_pattern(Vpin_3NegClocks_start, Vpin_3NegClocks_stop);	
+	wait.delay_10_us(350);
+	Gage_Start_Capture(  );
+	CsDo(hSystem, ACTION_FORCE); // Force capture. //
+	Gage_Wait_For_Capture_Complete();
+
+	// Search result //
+	Gage_Find_DChUp(&tChUp_RTM_P);
+
+//ILIM_END:;
+		// Power down //
+		pv3_4->set_current(0.1e-9, RANGE_10_A);
+		pv3_4->set_voltage(0.0, RANGE_100_V);
+		wait.delay_10_us(10);
+		pv3_4->drive_off();
+		delay(1);
+		pv3_4->open_switch(PV3_LOW_FORCE_2);
+		pv3_4->open_switch(PV3_LOW_SENSE_2);
+		pv3_4->open_switch(PV3_HIGH_FORCE_1);
+		pv3_4->open_switch(PV3_HIGH_SENSE_1);
+		delay(1);
+		pv3_4->charge_on();	
+	// Power down //
+	Power_Down_Everything_Except_Buf_Clamp();
+	//mux_20->open_relay(MUX_3_1);
+	//mux_20->open_relay(MUX_3_2);
+	tmu_6->open_relay(TMU_EXT_DRV2);
+	Open_All_Relays();
+
+
+	//printf("g_VoffsetRxTx = %.4f \n", g_VoffsetRxTx);
+	
+	// Datalog
+	PiDatalog(func, A_IlimHigh_JitterLow_S,			gIdmax_Jitter_132kHz,			set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_IlimLow_JitterHigh_S,			gIdmin_Jitter_132kHz,			set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_ILIM_Jit132K_S,				ILIM_Reduce_w_Jitter_132kHz,	set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_ILIM_Jit18K_S,				ILIM_Jit18K_S,		set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_IlimHigh_JitterLow_18kHz_S,	ILIMhi_Jit18K_S,			set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_IlimLow_JitterHigh_18kHz_S,	ILIMLo_Jit18K_S,			set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_Fosc_Mod_18kHz_S,				Fosc_Mod_18K_S,				set_fail_bin,	POWER_KILO);
+
+	if (strcmp("INN3468C-HR09", Dev_id) == 0 || strcmp("INN3468C-HY11", Dev_id) == 0 || strcmp("INN3468C-HZ12", Dev_id) == 0)
+	{
+		float LSL = gILIM_TARGET_S * 0.93;
+		float USL = gILIM_TARGET_S * 1.07;
+		func.dlog->set_test_no(A_ILIM_S + 1);
+		func.dlog->set_min_limit_value(LSL);
+		func.dlog->set_max_limit_value(USL);
+	}
+	PiDatalog(func, A_ILIM_S,			ILIM_S,				set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_DIDT_S,			DIDT_S,				set_fail_bin,	POWER_MILLI);
+	PiDatalog(func, A_TON_S,			TON_S,				set_fail_bin,	POWER_MICRO);
+
+	PiDatalog(func, A_I2F_S,			I2F_S,				set_fail_bin,	POWER_UNIT);
+
+	if(TRIM_ENABLE)
+	{
+		PiDatalog(func, A_ILIM_exp_S,	gILIM_exp_S,		set_fail_bin,	POWER_UNIT);	
+		PiDatalog(func, A_ILIM_act_S,	ILIM_act_S,			set_fail_bin,	POWER_UNIT);
+	}
+
+	//PiDatalog(func, A_ILIM_Low_S,				gILIM_pct_1stP,				set_fail_bin,	POWER_UNIT);
+	//PiDatalog(func, A_ILIM_Med_S,				gILIM_pct_2ndP,				set_fail_bin,	POWER_UNIT);
+	//PiDatalog(func, A_ILIM_High_S,				gILIM_pct_3rdP,				set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_ILIM_RTM_Slope,			gRTM_Slope,					set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_tDelta_RTM_Slope_30us_S,	gtDelta_RTM_Slope,			set_fail_bin,	POWER_MICRO);
+	PiDatalog(func, A_i_pct_drop_RTM,			-gi_pct_drop_RTM,			set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_tDelta_RTM_Slope_200us_S,	gtDelta_RTM_Slope_200us,	set_fail_bin,	POWER_MICRO);
+	PiDatalog(func, A_ILIM_200us_S,				gILIM_200us_S,				set_fail_bin, POWER_MILLI);
+	PiDatalog(func, A_ILIM_200us_pct_S,			-gILIM_200us_pct_S,			set_fail_bin, POWER_UNIT);
+
+	PiDatalog(func, A_RxTx_CycReq_cnt,		RxTx_CycReq_cnt,		set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_RxTx_Hi_BPS_Low_Rcv,	RxTx_Hi_BPS_Low_Rcv-6,	set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_RxTx_Lo_BPS_Low_Rcv,	RxTx_Lo_BPS_Low_Rcv-6,	set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_RxTx_Hi_BPS_High_Rcv,	RxTx_Hi_BPS_High_Rcv-6,	set_fail_bin,	POWER_UNIT);
+	PiDatalog(func, A_RxTx_Lo_BPS_High_Rcv,	RxTx_Lo_BPS_High_Rcv-6,	set_fail_bin,	POWER_UNIT);
+	
+	if(gTrim_iLselOff_P==0)
+	{
+		int result = 99;
+		char *ptr_Dev_id = Dev_id;
+		while (*ptr_Dev_id != '\0')
+		{
+			*ptr_Dev_id = toupper((unsigned char)*ptr_Dev_id);
+			++ptr_Dev_id;
+		}
+		if (strcmp("INN3468C-HR09", Dev_id) == 0 || strcmp("INN3468C-HY11", Dev_id) == 0 || strcmp("INN3468C-HZ12", Dev_id) == 0)
+		{
+			float LSL = 2.6 * 0.93;
+			float USL = 2.6 * 1.07;
+			func.dlog->set_test_no(A_ILIM_P1_S + 1);
+			func.dlog->set_min_limit_value(LSL);
+			func.dlog->set_max_limit_value(USL);
+		}
+
+		PiDatalog(func, A_ILIM_P1_S,		ILIM_P1_S,		set_fail_bin,	POWER_MILLI);
+		PiDatalog(func, A_DIDT_P1_S,		DIDT_P1_S,		set_fail_bin,	POWER_MILLI);
+		PiDatalog(func, A_TON_P1_S,			TON_P1_S,		set_fail_bin,	POWER_MICRO);
+		PiDatalog(func, A_RDSON_P1_S,		RDSON_P1_S,		set_fail_bin,	POWER_UNIT);
+	}
+	
+
+	if(gDisplay_ErrDlog)
+	{
+		PiDatalog(func, A_ILIM_Err_S,		ILIM_S_Err,			set_fail_bin,	POWER_UNIT);
+		/*PiDatalog(func, A_DIDT_Err_S,		DIDT_S_Err,			set_fail_bin,	POWER_UNIT);
+		PiDatalog(func, A_I2F_Err_S,		I2F_S_Err,			set_fail_bin,	POWER_UNIT);
+		PiDatalog(func, A_ILIM_Low_Err_S,			ILIM_LO_Err_S,				set_fail_bin,	POWER_UNIT);
+		PiDatalog(func, A_ILIM_Med_Err_S,			ILIM_Med_Err_S,				set_fail_bin,	POWER_UNIT);
+		PiDatalog(func, A_ILIM_High_Err_S,			ILIM_High_Err_S,*/			/*set_fail_bin,	POWER_UNIT);*/
+		if(gTrim_iLselOff_P==0)
+		PiDatalog(func, A_ILIM_P1_Err_S,	ILIM_P1_S_Err,	set_fail_bin,	POWER_UNIT);
+	}
+
+	if(gTrim_SAM_P || gTrim_DsoftEn_S)
+	{
+		PiDatalog(func, A_Fosc_Sss_P,			Fosc_Sss_P,					set_fail_bin,	POWER_KILO);
+		PiDatalog(func, A_Fosc_Mod_S,			fModulation_P,				set_fail_bin,	POWER_KILO);
+        
+		if (strcmp("INN3468C-HR09", Dev_id) == 0 || strcmp("INN3468C-HY11", Dev_id) == 0 || strcmp("INN3468C-HZ12", Dev_id) == 0)
+		{
+			float LSL = (gILIM_TARGET_S * 0.8) * 0.93;
+			float USL = (gILIM_TARGET_S * 0.8) * 1.07;
+			func.dlog->set_test_no(A_ILIM_70pct_mA_P + 1);
+			func.dlog->set_min_limit_value(LSL);
+			func.dlog->set_max_limit_value(USL);
+		}
+		PiDatalog(func, A_ILIM_70pct_mA_P,		ILIM_70pct_mA_P,			set_fail_bin,	POWER_MILLI);
+		PiDatalog(func, A_ILIM_70pct_P,			ILIM_70pct_P,				set_fail_bin,	POWER_UNIT);
+		PiDatalog(func, A_tsoft_SSS,			tsoft_SSS,					set_fail_bin,	POWER_MILLI);
+		PiDatalog(func, A_tHandshake_SSS,		tHandshake_SSS,				set_fail_bin,	POWER_MICRO);
+		PiDatalog(func, A_Fosc_min_SSS,			Fosc_min_SSS,				set_fail_bin,	POWER_KILO);
+		PiDatalog(func, A_Fosc_max_SSS,			Fosc_max_SSS,				set_fail_bin,	POWER_KILO);
+		if(gSiliconRev_P>=3)
+			PiDatalog(func, A_tRTMrelease,			tRTM,						set_fail_bin,	POWER_MICRO);
+	}
+
+		PiDatalog(func, A_tChUp_RTM_P,			tChUp_RTM_P,				set_fail_bin,	POWER_MICRO);
+
+  //  if (PiGetAnyFailStatus())     
+		//delay(1);
+
+	if(gDEBUG)
+	printf("Function ILIM Done\n");
+
+}
