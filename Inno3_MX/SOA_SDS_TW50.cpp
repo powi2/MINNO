@@ -161,9 +161,9 @@ SOA test: (safe operating area)
 		tmu_trig	= 10.0;	//set for clean triggering
 		//vSDS = 22.0;		//no longer used	//updated from 19.5 to 22V to pass SDS-S  cx. 11/7/2016
 	}
-	else if (MOSFET_SIZE == 5)	//CE,EP family and ILIM = 1150mA
+	else if (MOSFET_SIZE == 5)	//MINNO ILIM = 1150mA
 	{
-		vSOA = 20.0;		//search starting point
+		vSOA = 19.0;		//search starting point
 		if(g_TurretCB)
 		{
 			tmu_trig	= 5.0;	//set for clean triggering. Used to be 5.

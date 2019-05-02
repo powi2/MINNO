@@ -55,7 +55,7 @@ void STRESS(test_function& func)
 	//}
 	//if ((strcmp("INN3468C-HZ12", Dev_id) == 0) || (strcmp("INN3468C-HR09", Dev_id) == 0))
 	//	gStress_ON = 1;		// STRESS evaluation
-
+	return;// STRESS test disabled temporarily
 	// Not stressing at 4250/4300/4500.
 	//if(OPCODE==4250 || OPCODE==4300 || OPCODE==4500 || gStress_ON==0)
 	if((OPCODE != 4200) || (gStress_ON == 0) || (gTrimmed_Device == 1)) // && (strcmp("INN3468C-HZ12", Dev_id) != 0)))

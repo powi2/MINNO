@@ -162,7 +162,7 @@ void VBP_Init(test_function& func)
 	//if(BPP_4p7uF) delay(22);
 
 	//Vshunt_Init_Pr = BPP_ovi->measure_average(10);
-	pulse.do_pulse();
+	//pulse.do_pulse();
 	Vshunt_Init_Se = BPS_dvi->measure_average(10);
 	gVshunt_Init_Pr = Vshunt_Init_Pr;
 	gVshunt_Init_Se = Vshunt_Init_Se;

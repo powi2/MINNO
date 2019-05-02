@@ -62,6 +62,10 @@
 						 - Limit update for Hcode test in STRESS.prg and POST_STRESS.prg
 						 - Enable stress test for trimmed and untrimmed unit for special case INN3468C-HZ12
 01/xx/19  ET  v0.06a     - rev 10 LB, modified ILIM algorithm
+04/19/19  KJ  v0.06b     - Limits update for BPP_IS2 STRESS test for INN3465C.prg
+                         - STRESS test disabaled
+						 - VSOA search strating voltage change for sizex5
+04/24/19  KJ  v0.06c     - Fixed ILIM issue of part going into ILIM+1 mode when measuring ILIM_norm
 
 History Revisions (Above)
 */
@@ -74,7 +78,7 @@ History Revisions (Above)
 
 #define INNO3_MX			// uncomment for InnoSwitch3-MX test programs
 #define PRG_FAMILYNAME		"Inno3_MX"
-#define PRG_REVISION		"0.06a"
+#define PRG_REVISION		"0.06c"
 #define TRIMOPS_REVISION	"2.5"
 
 #include "asl.h"
@@ -7264,7 +7268,7 @@ void search_VBPS_P_th( float* vBPS_p)
 	//delay(1);
 //
 //BPS_ISS1: BPS Non-switching current. Bring REQ to 1V and BPS to 5V
-	pulse.do_pulse();
+	//pulse.do_pulse();
 	BPS_dvi->set_voltage(BPS_ch, 5.0, VOLT_10_RANGE);
 	//BPS_dvi->set_current(BPS_ch, 3e-3,	RANGE_3_MA);
 	//ovi_1->disconnect(5);//Float ACK
@@ -14288,7 +14292,7 @@ void Gage_Capture_Ilim(int Ilim_mode, float InvSync_vREF)
 	int		SR_AF_temp[100]	 = {0};
 
 	Close_relay(K3);				// Drain to L1 to 50ohm to K2NC to K1NC to DVI-11-0 (delay is inside power-up)
-	Close_relay(K37);				// Connect 1uF to BPP pin via K37
+	//Close_relay(K37);				// Connect 1uF to BPP pin via K37
 	delay(4);
 
 	Power_Up_Primary_BypassWL_TM5(Ilim_mode);
@@ -14434,7 +14438,7 @@ void Gage_Capture_Ilim_SSS(int Ilim_mode, float InvSync_vREF)
 	pv3_4->charge_off();
 
 	PV3_Connect_Drain_and_DriveON(Vind_RM); //Drive Voltage
-pulse.do_pulse();
+//pulse.do_pulse();
 	Gage_Start_Capture();
 
 	BPS_dvi->set_current(BPS_ch, 300e-3,					RANGE_300_MA);	 
@@ -14463,7 +14467,7 @@ pulse.do_pulse();
 	wait.delay_10_us(20);
 
 	Gage_Wait_For_Capture_Complete();
-pulse.do_pulse();
+//pulse.do_pulse();
 	PV3_Disconnect_Drain_and_DriveOFF();
 }
 
@@ -14884,7 +14888,7 @@ void Gage_Find_Ilim_MINNO(float *Idmax_ave, float *DiDt_ave, float *Ton_ave, flo
 			if(DEBUG==1 && gDEBUG)
 				MessageBox(NULL, "Error: PULSE_NUM_PROCESSED is less than PULSE_NUM_NEED",Func_name, MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
 	}
-
+	
 	//DEBUG text File
 	if(DEBUG==1 && gDEBUG)
 	{
@@ -22695,7 +22699,8 @@ void Power_Up_Primary_BypassWL_TM5(int ILIM_Select)
 	wait.delay_10_us(5);
 
 	// BPP ramp up to 5.0V with 200mV step, then from 5V to VBPP_plus + 200mV
-	VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+//	VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.2);	// vstart, vstop, vstep	
+	VBPP_ramp_up(gVBPP_Low_Voltage_PU, 5.0, 0.025);	// vstart, vstop, vstep	
 
 	// Setup Vpin for digital clocking
 	Close_relay(K12);						// Connect DDD7_1	to Vpin(UV)	pin
@@ -22709,19 +22714,23 @@ void Power_Up_Primary_BypassWL_TM5(int ILIM_Select)
 	if (ILIM_Select == ILIM_NORM || ILIM_Select == ILIM_INCR)
 	{
 		D_dvi->set_voltage(D_ch, 15.0, 		RANGE_50_V);
-		wait.delay_10_us(30);
+		//D_dvi->set_voltage(D_ch, 45.0, 		RANGE_50_V);
+		//wait.delay_10_us(30);		
+	      wait.delay_10_us(10);
 	}
 
 	// Bpp ramp from 5V -> 5.5V -> 5V with 50mV step
-	VBPP_ramp_up(5.0, gVBPP_PV_final, 0.1);
-	wait.delay_10_us(10);
+     VBPP_ramp_up(5.0, gVBPP_PV_final, 0.1);
+	//VBPP_ramp_up(5.0, gVBPP_PV_final, 0.025);
+	//wait.delay_10_us(10);
 
 	// Drain 0V to enter TM2
 	D_dvi->set_voltage(D_ch, 0.0, 		RANGE_50_V);
-	wait.delay_10_us(30);
+	wait.delay_10_us(10);
 
 	VBPP_ramp_down(gVBPP_PV_Init, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep
-
+//	VBPP_ramp_down(gVBPP_PV_final, gVBPP_M_Init +0.25, 0.1);	// vstart, vstop, vstep
+	//VBPP_ramp_down(gVBPP_PV_final, gVBPP_M_Init +0.25, 0.05);	// vstart, vstop, vstep
 	// Determine what ILIM mode we want to be power-up in  (IMPORTANT: ZF-P MUST TRIM FOR REFLECTION)
 	if     (ILIM_Select == ILIM_NORM)				wait.delay_10_us(3);	//1.0 uF	(ILIM)		30us
 	else if(ILIM_Select == ILIM_INCR)				wait.delay_10_us(150);	//10  uF	(ILIM+1)	1.2ms
@@ -22734,7 +22743,8 @@ void Power_Up_Primary_BypassWL_TM5(int ILIM_Select)
 	wait.delay_10_us(50);
 
 	BPP_ovi->set_current(BPP_ch, 3e-3,	RANGE_30_MA);
-	VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 0.1);	// vstart, vstop, vstep
+//	VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 0.1);	// vstart, vstop, vstep
+	VBPP_ramp_up(gVBPP_M_Init -0.2, gVBPP_P_final, 0.01);	// vstart, vstop, vstep
 	wait.delay_10_us(10);
 
 	// Drain set to 5V for switching

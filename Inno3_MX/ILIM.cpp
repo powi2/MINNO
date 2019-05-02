@@ -153,7 +153,7 @@ void ILIM(test_function& func)
 	// Setup Digitizer //
 	SAMPLE_SIZE = GAGE_POST_32K;
 	INNO_Gage_ChanAB_setup(0.07);	// Only do it if SAMPLE_SIZE is diff from previous. (Each input/trig control function takes 4ms)
-
+	//pulse.do_pulse();
 	Gage_Capture_Ilim(ILIM_NORM, InvSync_vREF);
 
 	// Process data
@@ -185,6 +185,7 @@ void ILIM(test_function& func)
 	 ********************************************************************************/
 	if (gTrim_iLselOff_P == 0)
 	{
+		//pulse.do_pulse();
 		Gage_Capture_Ilim(ILIM_INCR, InvSync_vREF);
 
 		// Process data

@@ -90,11 +90,13 @@ void Feature_Trim_S(test_function& func)
 	if ((gTrim_PKdig_S & 2) == 2)	Trim_S[gPKdig_AF_Addr_Start + 1]	= true;
 	if ((gTrim_PKdig_S & 4) == 4)	Trim_S[gPKdig_AF_Addr_Start + 2]	= true;
 	if ((gTrim_PKdig_S & 8) == 8)	Trim_S[gPKdig_AF_Addr_Start + 3]	= true;
-
-	if (g_Stress_passed == 1)	//Only trim Vshunt bit if Stress test passed
-	{
-		Trim_S[gVshunt_AF_Addr_Start] = gTrim_Vshunt_S;
-	}
+	
+	//STRESS test disabled temporarily, enable stress for final release
+	//if (g_Stress_passed == 1)	//Only trim Vshunt bit if Stress test passed
+	//{
+	//	Trim_S[gVshunt_AF_Addr_Start] = gTrim_Vshunt_S;
+	//}
+	Trim_S[gVshunt_AF_Addr_Start] = gTrim_Vshunt_S;
 
 	//Determine IintTC trim bits,		4 bits
 	if ((gTrim_IintTC_S & 1) == 1)	Trim_S[gIintTC_AF_Addr_Start]		= true;
